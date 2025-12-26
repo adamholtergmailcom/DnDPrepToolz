@@ -307,3 +307,107 @@ function addItemToSection(
       break;
   }
 }
+
+// Parse markdown into sections for regeneration
+export function parseSections(markdown: string): { heading: string; level: number; content: string; startIndex: number; endIndex: number }[] {
+  const sections: { heading: string; level: number; content: string; startIndex: number; endIndex: number }[] = [];
+  const lines = markdown.split('\n');
+  let currentSection: { heading: string; level: number; startIndex: number; contentStart: number } | null = null;
+  let lineIndex = 0;
+  let charIndex = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+
+    if (headingMatch) {
+      // Close previous section
+      if (currentSection) {
+        sections.push({
+          heading: currentSection.heading,
+          level: currentSection.level,
+          content: markdown.slice(currentSection.contentStart, charIndex).trim(),
+          startIndex: currentSection.startIndex,
+          endIndex: charIndex,
+        });
+      }
+
+      currentSection = {
+        heading: headingMatch[2],
+        level: headingMatch[1].length,
+        startIndex: charIndex,
+        contentStart: charIndex + line.length + 1,
+      };
+    }
+
+    charIndex += line.length + 1; // +1 for newline
+    lineIndex++;
+  }
+
+  // Close last section
+  if (currentSection) {
+    sections.push({
+      heading: currentSection.heading,
+      level: currentSection.level,
+      content: markdown.slice(currentSection.contentStart).trim(),
+      startIndex: currentSection.startIndex,
+      endIndex: markdown.length,
+    });
+  }
+
+  return sections;
+}
+
+// Regenerate a specific section
+export async function regenerateSection(
+  apiKey: string,
+  modelId: string,
+  fullMarkdown: string,
+  sectionHeading: string,
+  plan: DocPlan,
+  feedback?: string
+): Promise<string> {
+  const sections = parseSections(fullMarkdown);
+  const targetSection = sections.find(s => s.heading === sectionHeading);
+
+  if (!targetSection) {
+    throw new Error(`Section "${sectionHeading}" not found`);
+  }
+
+  const prompt = `You are regenerating a specific section of a D&D document.
+
+## Context
+Document Title: ${plan.title}
+Section to Regenerate: ${targetSection.heading}
+
+## Entity Registry (for reference)
+${JSON.stringify(plan.entityRegistry, null, 2)}
+
+## Previous Section Content
+${targetSection.content}
+
+${feedback ? `## User Feedback\n${feedback}` : ''}
+
+## Instructions
+Regenerate ONLY this section's content, improving it based on any feedback provided.
+- Maintain the same formatting conventions (:::readaloud, :::note, :::statblock, etc.)
+- Keep references to other entities consistent
+- Do NOT include the section heading itself, just the content
+- Match the tone and style of the document
+
+Generate the new section content:`;
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: DRAFT_SYSTEM_PROMPT },
+    { role: 'user', content: prompt },
+  ];
+
+  const response = await chatCompletion(apiKey, modelId, messages, undefined, 0.8);
+  const newContent = response.choices[0]?.message?.content || '';
+
+  // Replace the section in the original markdown
+  const headingPrefix = '#'.repeat(targetSection.level);
+  const newSection = `${headingPrefix} ${targetSection.heading}\n\n${newContent.trim()}`;
+
+  return fullMarkdown.slice(0, targetSection.startIndex) + newSection + '\n\n' + fullMarkdown.slice(targetSection.endIndex).trim();
+}

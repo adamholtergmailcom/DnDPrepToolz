@@ -14,6 +14,7 @@ export interface AppSettings {
   falApiKey: string;
   defaultModelId: string;
   sharedContext?: SharedContext;
+  theme?: 'light' | 'dark' | 'system';
 }
 
 // OpenRouter Model
@@ -42,6 +43,11 @@ export interface Asset {
   mapFeedback?: string;  // User feedback for revision
   previewUrl?: string;
   createdAt: string;
+  // For image variations and history
+  allVariations?: string[];  // All generated variations
+  selectedVariationIndex?: number;  // Which variation is selected (0-indexed)
+  previousVersions?: { url: string; prompt: string; timestamp: string }[];  // History
+  aspectRatio?: string;  // User-selected aspect ratio override
 }
 
 // Entity types for the plan

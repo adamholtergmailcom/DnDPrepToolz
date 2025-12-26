@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Project } from '@/lib/types';
-import { getAllProjects, createProject, deleteProject, exportAllProjects, importProjects } from '@/lib/db';
+import { getAllProjects, createProject, deleteProject, duplicateProject, exportAllProjects, importProjects } from '@/lib/db';
 
 export default function HomePage() {
   const router = useRouter();
@@ -60,6 +60,18 @@ export default function HomePage() {
     }
   };
 
+  const handleDuplicate = async (id: string) => {
+    try {
+      const duplicate = await duplicateProject(id, true);
+      if (duplicate) {
+        setProjects([duplicate, ...projects]);
+      }
+    } catch (err) {
+      console.error('Failed to duplicate project:', err);
+      alert('Failed to duplicate project');
+    }
+  };
+
   const handleExport = async () => {
     try {
       const json = await exportAllProjects();
@@ -97,7 +109,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <header className="bg-red-900 text-white py-4 px-6 shadow-md">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <h1 className="text-2xl font-serif font-bold">D&D PDF Studio</h1>
@@ -111,7 +123,7 @@ export default function HomePage() {
 
       <main className="max-w-6xl mx-auto py-8 px-4">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-serif font-bold text-gray-900">Projects</h2>
+          <h2 className="text-2xl font-serif font-bold text-gray-900 dark:text-gray-100">Projects</h2>
           <div className="flex items-center gap-3">
             <button
               onClick={handleExport}
@@ -146,10 +158,10 @@ export default function HomePage() {
             <div className="animate-spin h-8 w-8 border-4 border-red-800 border-t-transparent rounded-full"></div>
           </div>
         ) : projects.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
             <div className="text-6xl mb-4">📜</div>
-            <h3 className="text-xl font-serif font-bold text-gray-900 mb-2">No Projects Yet</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-xl font-serif font-bold text-gray-900 dark:text-gray-100 mb-2">No Projects Yet</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               Create your first D&D content project to get started.
             </p>
             <button
@@ -164,23 +176,23 @@ export default function HomePage() {
             {projects.map(project => (
               <div
                 key={project.id}
-                className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition"
+                className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <Link
                       href={`/project/${project.id}`}
-                      className="text-lg font-serif font-bold text-red-900 hover:text-red-700 transition"
+                      className="text-lg font-serif font-bold text-red-900 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition"
                     >
                       {project.name}
                     </Link>
                     {project.docType && (
-                      <span className="ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">
+                      <span className="ml-2 px-2 py-0.5 text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded">
                         {project.docType}
                       </span>
                     )}
-                    <p className="text-gray-600 mt-1 line-clamp-2">{project.userRequest}</p>
-                    <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+                    <p className="text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{project.userRequest}</p>
+                    <div className="flex items-center gap-4 mt-3 text-sm text-gray-500 dark:text-gray-400">
                       <span>
                         {project.docPlan ? '✓ Plan' : '○ No plan'}
                       </span>
@@ -202,6 +214,13 @@ export default function HomePage() {
                     >
                       Open
                     </Link>
+                    <button
+                      onClick={() => handleDuplicate(project.id)}
+                      className="px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-md transition text-sm"
+                      title="Duplicate project"
+                    >
+                      Duplicate
+                    </button>
                     <button
                       onClick={() => handleDelete(project.id)}
                       className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition text-sm"

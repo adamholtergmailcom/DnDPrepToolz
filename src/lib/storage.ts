@@ -54,3 +54,24 @@ export function clearSettings(): void {
     console.error('Failed to clear settings');
   }
 }
+
+// Theme helpers
+export function getTheme(): 'light' | 'dark' | 'system' {
+  return getSettings().theme || 'system';
+}
+
+export function setTheme(theme: 'light' | 'dark' | 'system'): void {
+  const settings = getSettings();
+  saveSettings({ ...settings, theme });
+}
+
+export function getEffectiveTheme(): 'light' | 'dark' {
+  const theme = getTheme();
+  if (theme === 'system') {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  }
+  return theme;
+}

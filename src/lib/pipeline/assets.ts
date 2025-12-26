@@ -350,6 +350,126 @@ export async function reviseMapWithFeedback(
   };
 }
 
+// Regenerate an individual asset with optional new prompt and aspect ratio
+export async function regenerateAsset(
+  falApiKey: string,
+  asset: Asset,
+  options?: {
+    newPrompt?: string;
+    aspectRatio?: string;
+    numVariations?: number;
+  }
+): Promise<Asset> {
+  const prompt = options?.newPrompt || asset.prompt;
+  const aspectRatio = options?.aspectRatio || asset.aspectRatio;
+  const numVariations = options?.numVariations || 1;
+
+  // Store current version in history
+  const previousVersions = asset.previousVersions || [];
+  if (asset.urls[0]) {
+    previousVersions.push({
+      url: asset.urls[0],
+      prompt: asset.prompt,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // For maps, use nano-banana
+  if (asset.isMap) {
+    const { generateImageBanana } = await import('../falai');
+    const result = await generateImageBanana(falApiKey, {
+      prompt: `${prompt}, top-down fantasy map, detailed cartography, parchment style, crisp lines, clear labels`,
+      aspect_ratio: mapAspectRatioToBanana(aspectRatio),
+      num_images: numVariations,
+    });
+
+    const imageUrls = result.images.map(img => img.url);
+
+    return {
+      ...asset,
+      prompt,
+      urls: [imageUrls[0]],
+      allVariations: imageUrls,
+      selectedVariationIndex: 0,
+      width: result.images[0]?.width,
+      height: result.images[0]?.height,
+      model: 'fal-ai/nano-banana',
+      mapStatus: 'preview',
+      previewUrl: imageUrls[0],
+      previousVersions,
+      aspectRatio,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  // For non-maps, use z-image
+  const result = await generateImageZ(falApiKey, {
+    prompt,
+    image_size: mapAspectRatio(aspectRatio),
+    num_images: numVariations,
+    enable_prompt_expansion: false,
+  });
+
+  const imageUrls = result.images.map(img => img.url);
+  let finalUrls = imageUrls;
+  let model = 'fal-ai/z-image/turbo';
+
+  // Check if this needs background removal (tokens)
+  const needsBgRemoval = asset.purpose.toLowerCase().includes('token');
+
+  if (needsBgRemoval && numVariations === 1) {
+    try {
+      const bgRemoved = await removeBackground(falApiKey, { image_url: imageUrls[0] });
+      finalUrls = [bgRemoved.image.url];
+      model = 'fal-ai/z-image/turbo + smoretalk-ai/rembg-enhance';
+    } catch {
+      console.error('Background removal failed, using original image');
+    }
+  }
+
+  return {
+    ...asset,
+    prompt,
+    urls: [finalUrls[0]],
+    allVariations: finalUrls.length > 1 ? finalUrls : imageUrls,
+    selectedVariationIndex: 0,
+    width: result.images[0]?.width,
+    height: result.images[0]?.height,
+    model,
+    previousVersions,
+    aspectRatio,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// Select a specific variation as the main image
+export function selectVariation(asset: Asset, variationIndex: number): Asset {
+  if (!asset.allVariations || variationIndex >= asset.allVariations.length) {
+    return asset;
+  }
+
+  return {
+    ...asset,
+    urls: [asset.allVariations[variationIndex]],
+    selectedVariationIndex: variationIndex,
+  };
+}
+
+// Revert to a previous version
+export function revertToPreviousVersion(asset: Asset, versionIndex: number): Asset {
+  if (!asset.previousVersions || versionIndex >= asset.previousVersions.length) {
+    return asset;
+  }
+
+  const version = asset.previousVersions[versionIndex];
+
+  return {
+    ...asset,
+    urls: [version.url],
+    prompt: version.prompt,
+  };
+}
+
 // Finalize a map by refining with edit and upscaling with SeedVR2
 export async function finalizeMapWithPro(
   falApiKey: string,

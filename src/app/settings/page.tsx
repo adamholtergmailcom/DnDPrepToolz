@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getSettings, saveSettings } from '@/lib/storage';
 import { AppSettings } from '@/lib/types';
 import ModelPicker from '@/components/ModelPicker';
+import { useTheme } from '@/components/ThemeProvider';
 
 // Wrapper to safely initialize settings on client side
 function useClientSettings(): [AppSettings, React.Dispatch<React.SetStateAction<AppSettings>>] {
@@ -18,6 +19,7 @@ function useClientSettings(): [AppSettings, React.Dispatch<React.SetStateAction<
 export default function SettingsPage() {
   const [settings, setSettings] = useClientSettings();
   const [saved, setSaved] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const handleSave = () => {
     saveSettings(settings);
@@ -26,7 +28,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <header className="bg-red-900 text-white py-4 px-6 shadow-md">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link href="/" className="text-2xl font-serif font-bold hover:text-yellow-300 transition">
@@ -41,9 +43,9 @@ export default function SettingsPage() {
       </header>
 
       <main className="max-w-2xl mx-auto py-8 px-4">
-        <h1 className="text-3xl font-serif font-bold text-gray-900 mb-6">Settings</h1>
+        <h1 className="text-3xl font-serif font-bold text-gray-900 dark:text-gray-100 mb-6">Settings</h1>
 
-        <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 space-y-6">
           {/* OpenRouter API Key */}
           <div>
             <label htmlFor="openrouter-key" className="block text-sm font-medium text-gray-700 mb-1">
@@ -102,6 +104,28 @@ export default function SettingsPage() {
             selectedModelId={settings.defaultModelId}
             onSelect={(modelId) => setSettings({ ...settings, defaultModelId: modelId })}
           />
+
+          {/* Theme Selection */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Appearance</h3>
+            <div className="flex gap-2">
+              {(['light', 'dark', 'system'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTheme(t)}
+                  className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
+                    theme === t
+                      ? 'bg-red-800 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {t === 'light' && 'Light'}
+                  {t === 'dark' && 'Dark'}
+                  {t === 'system' && 'System'}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Shared Context / Campaign Defaults */}
           <div className="border-t border-gray-200 pt-6">

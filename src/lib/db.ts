@@ -70,6 +70,24 @@ export async function createProject(name: string, userRequest: string, docType?:
   return project;
 }
 
+// Duplicate a project
+export async function duplicateProject(id: string, includeAssets: boolean = true): Promise<Project | null> {
+  const original = await getProject(id);
+  if (!original) return null;
+
+  const duplicate: Project = {
+    ...original,
+    id: crypto.randomUUID(),
+    name: `${original.name} (Copy)`,
+    assets: includeAssets ? original.assets.map(a => ({ ...a })) : [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveProject(duplicate);
+  return duplicate;
+}
+
 // Export all projects as JSON
 export async function exportAllProjects(): Promise<string> {
   const projects = await getAllProjects();

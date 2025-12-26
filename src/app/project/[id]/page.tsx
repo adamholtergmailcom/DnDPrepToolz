@@ -8,8 +8,15 @@ import { Project, PipelineState } from '@/lib/types';
 import { getProject, saveProject } from '@/lib/db';
 import { getSettings } from '@/lib/storage';
 import { generatePlan } from '@/lib/pipeline/plan';
-import { generateDraft } from '@/lib/pipeline/draft';
-import { generateAllAssets, approveMap, reviseMapWithFeedback, finalizeMapWithPro } from '@/lib/pipeline/assets';
+import { generateDraft, parseSections, regenerateSection } from '@/lib/pipeline/draft';
+import {
+  generateAllAssets,
+  approveMap,
+  reviseMapWithFeedback,
+  finalizeMapWithPro,
+  regenerateAsset,
+  selectVariation,
+} from '@/lib/pipeline/assets';
 import { renderToHtml } from '@/lib/pipeline/render';
 
 // Dynamic import for PageFlipper to avoid SSR issues
@@ -63,9 +70,12 @@ export default function ProjectPage() {
 
   const saveProjectData = useCallback(async (updates: Partial<Project>) => {
     if (!project) return;
+    setSaveStatus('saving');
     const updated = { ...project, ...updates };
     setProject(updated);
     await saveProject(updated);
+    setSaveStatus('saved');
+    setLastSaved(new Date());
   }, [project]);
 
   const handleSaveRequest = async () => {
@@ -199,6 +209,44 @@ export default function ProjectPage() {
   const [feedbackModal, setFeedbackModal] = useState<{ assetId: string; isOpen: boolean }>({ assetId: '', isOpen: false });
   const [feedbackText, setFeedbackText] = useState('');
 
+  // Asset edit/regenerate modal state
+  const [assetEditModal, setAssetEditModal] = useState<{
+    assetId: string;
+    isOpen: boolean;
+    mode: 'edit' | 'variations';
+  }>({ assetId: '', isOpen: false, mode: 'edit' });
+  const [editPrompt, setEditPrompt] = useState('');
+  const [editAspectRatio, setEditAspectRatio] = useState('');
+  const [numVariations, setNumVariations] = useState(4);
+
+  // Lightbox state
+  const [lightbox, setLightbox] = useState<{ isOpen: boolean; imageUrl: string; assetPurpose: string }>({
+    isOpen: false,
+    imageUrl: '',
+    assetPurpose: '',
+  });
+
+  // Asset filter state
+  const [assetFilter, setAssetFilter] = useState<'all' | 'portraits' | 'maps' | 'items' | 'scenes'>('all');
+
+  // PDF export format modal
+  const [exportModal, setExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'Letter' | 'A4' | 'A5' | 'Digest'>('Letter');
+
+  // Save status for auto-save indicator
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Keyboard shortcuts state
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Section regeneration modal
+  const [sectionModal, setSectionModal] = useState<{ isOpen: boolean; sectionHeading: string }>({
+    isOpen: false,
+    sectionHeading: '',
+  });
+  const [sectionFeedback, setSectionFeedback] = useState('');
+
   // MAP WORKFLOW: Approve (use preview as final)
   const handleApproveMap = async (assetId: string) => {
     const asset = project?.assets.find(a => a.id === assetId);
@@ -263,6 +311,146 @@ export default function ProjectPage() {
     }
   };
 
+  // ASSET EDIT: Open edit modal
+  const openAssetEditModal = (assetId: string, mode: 'edit' | 'variations') => {
+    const asset = project?.assets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    setEditPrompt(asset.prompt);
+    setEditAspectRatio(asset.aspectRatio || '');
+    setAssetEditModal({ assetId, isOpen: true, mode });
+  };
+
+  // ASSET EDIT: Regenerate with new prompt
+  const handleRegenerateAsset = async () => {
+    const asset = project?.assets.find(a => a.id === assetEditModal.assetId);
+    if (!asset) return;
+
+    const settings = getSettings();
+    if (!settings.falApiKey) {
+      alert('Please set your fal.ai API key in Settings.');
+      return;
+    }
+
+    setPipeline({ step: 'generating-assets', progress: `Regenerating ${asset.purpose}...` });
+    setAssetEditModal({ assetId: '', isOpen: false, mode: 'edit' });
+
+    try {
+      const regenerated = await regenerateAsset(settings.falApiKey, asset, {
+        newPrompt: editPrompt,
+        aspectRatio: editAspectRatio || undefined,
+        numVariations: assetEditModal.mode === 'variations' ? numVariations : 1,
+      });
+
+      const updatedAssets = project!.assets.map(a =>
+        a.id === assetEditModal.assetId ? regenerated : a
+      );
+      await saveProjectData({ assets: updatedAssets });
+      setPipeline({ step: 'idle' });
+    } catch (err) {
+      setPipeline({
+        step: 'idle',
+        error: err instanceof Error ? err.message : 'Failed to regenerate asset',
+      });
+    }
+  };
+
+  // ASSET EDIT: Select a variation
+  const handleSelectVariation = async (assetId: string, variationIndex: number) => {
+    const asset = project?.assets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    const updated = selectVariation(asset, variationIndex);
+    const updatedAssets = project!.assets.map(a => a.id === assetId ? updated : a);
+    await saveProjectData({ assets: updatedAssets });
+  };
+
+  // ASSET EDIT: Quick regenerate (same prompt)
+  const handleQuickRegenerate = async (assetId: string) => {
+    const asset = project?.assets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    const settings = getSettings();
+    if (!settings.falApiKey) {
+      alert('Please set your fal.ai API key in Settings.');
+      return;
+    }
+
+    setPipeline({ step: 'generating-assets', progress: `Regenerating ${asset.purpose}...` });
+
+    try {
+      const regenerated = await regenerateAsset(settings.falApiKey, asset);
+      const updatedAssets = project!.assets.map(a => a.id === assetId ? regenerated : a);
+      await saveProjectData({ assets: updatedAssets });
+      setPipeline({ step: 'idle' });
+    } catch (err) {
+      setPipeline({
+        step: 'idle',
+        error: err instanceof Error ? err.message : 'Failed to regenerate asset',
+      });
+    }
+  };
+
+  // Filter assets by type
+  const getFilteredAssets = () => {
+    if (!project?.assets) return [];
+    if (assetFilter === 'all') return project.assets;
+
+    return project.assets.filter(asset => {
+      const purpose = asset.purpose.toLowerCase();
+      switch (assetFilter) {
+        case 'portraits':
+          return purpose.includes('portrait') || purpose.includes('npc') || purpose.includes('character');
+        case 'maps':
+          return asset.isMap || purpose.includes('map');
+        case 'items':
+          return purpose.includes('item') || purpose.includes('weapon') || purpose.includes('armor') || purpose.includes('artifact');
+        case 'scenes':
+          return purpose.includes('scene') || purpose.includes('location') || purpose.includes('illustration');
+        default:
+          return true;
+      }
+    });
+  };
+
+  // SECTION REGENERATION
+  const handleRegenerateSection = async () => {
+    if (!project?.markdown || !project?.docPlan) return;
+
+    const settings = getSettings();
+    if (!settings.openRouterApiKey) {
+      alert('Please set your OpenRouter API key in Settings.');
+      return;
+    }
+
+    setSectionModal({ isOpen: false, sectionHeading: '' });
+    setPipeline({ step: 'drafting', progress: `Regenerating "${sectionModal.sectionHeading}"...` });
+
+    try {
+      const newMarkdown = await regenerateSection(
+        settings.openRouterApiKey,
+        settings.defaultModelId,
+        project.markdown,
+        sectionModal.sectionHeading,
+        project.docPlan,
+        sectionFeedback || undefined
+      );
+
+      await saveProjectData({ markdown: newMarkdown });
+      setEditedMarkdown(newMarkdown);
+      setSectionFeedback('');
+      setPipeline({ step: 'idle' });
+    } catch (err) {
+      setPipeline({
+        step: 'idle',
+        error: err instanceof Error ? err.message : 'Failed to regenerate section',
+      });
+    }
+  };
+
+  // Get sections from markdown for the draft view
+  const markdownSections = project?.markdown ? parseSections(project.markdown) : [];
+
   // PIPELINE: Build Preview
   const handleBuildPreview = () => {
     if (!project?.markdown) {
@@ -288,20 +476,25 @@ export default function ProjectPage() {
     }
   };
 
-  // PIPELINE: Export PDF
-  const handleExportPdf = async () => {
+  // PIPELINE: Export PDF - opens format selector modal
+  const handleExportPdf = () => {
     if (!previewHtml) {
       alert('Please build a preview first.');
       return;
     }
+    setExportModal(true);
+  };
 
-    setPipeline({ step: 'rendering', progress: 'Generating PDF...' });
+  // PIPELINE: Actual PDF export with format
+  const doExportPdf = async () => {
+    setExportModal(false);
+    setPipeline({ step: 'rendering', progress: `Generating ${exportFormat} PDF...` });
 
     try {
       const response = await fetch('/api/export/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: previewHtml }),
+        body: JSON.stringify({ html: previewHtml, format: exportFormat }),
       });
 
       if (!response.ok) {
@@ -325,6 +518,73 @@ export default function ProjectPage() {
     }
   };
 
+  // Keyboard shortcuts effect
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const isMod = e.metaKey || e.ctrlKey;
+
+      // ? - Show shortcuts help
+      if (e.key === '?' && !isMod) {
+        e.preventDefault();
+        setShowShortcuts(prev => !prev);
+        return;
+      }
+
+      // Escape - Close modals
+      if (e.key === 'Escape') {
+        setShowShortcuts(false);
+        setLightbox({ isOpen: false, imageUrl: '', assetPurpose: '' });
+        setAssetEditModal({ assetId: '', isOpen: false, mode: 'edit' });
+        setFeedbackModal({ assetId: '', isOpen: false });
+        setExportModal(false);
+        return;
+      }
+
+      // Tab navigation with 1-5
+      if (!isMod && ['1', '2', '3', '4', '5'].includes(e.key)) {
+        e.preventDefault();
+        const tabs: TabType[] = ['request', 'plan', 'draft', 'assets', 'preview'];
+        setActiveTab(tabs[parseInt(e.key) - 1]);
+        return;
+      }
+
+      // Mod+G - Generate (plan, draft, or assets depending on state)
+      if (isMod && e.key === 'g') {
+        e.preventDefault();
+        if (!project?.docPlan) {
+          handleGeneratePlan();
+        } else if (!project?.markdown) {
+          handleGenerateDraft();
+        } else if (project.assets.length === 0) {
+          handleGenerateAssets();
+        }
+        return;
+      }
+
+      // Mod+B - Build preview
+      if (isMod && e.key === 'b') {
+        e.preventDefault();
+        handleBuildPreview();
+        return;
+      }
+
+      // Mod+E - Export PDF
+      if (isMod && e.key === 'e') {
+        e.preventDefault();
+        handleExportPdf();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -340,7 +600,7 @@ export default function ProjectPage() {
   const pendingMapApprovals = project.assets.filter(a => a.isMap && a.mapStatus === 'preview');
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
       {/* Header */}
       <header className="bg-red-900 text-white py-4 px-6 shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -352,6 +612,11 @@ export default function ProjectPage() {
             <h1 className="text-lg font-medium">{project.name}</h1>
           </div>
           <nav className="flex items-center gap-4">
+            {/* Save Status Indicator */}
+            <span className="text-xs text-yellow-200">
+              {saveStatus === 'saving' && 'Saving...'}
+              {saveStatus === 'saved' && lastSaved && `Saved ${lastSaved.toLocaleTimeString()}`}
+            </span>
             <Link href="/settings" className="text-sm hover:text-yellow-300 transition">
               Settings
             </Link>
@@ -372,7 +637,7 @@ export default function ProjectPage() {
       )}
 
       {/* Action Buttons */}
-      <div className="bg-white border-b px-6 py-3">
+      <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-6 py-3">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
           <button
             onClick={handleGeneratePlan}
@@ -425,15 +690,15 @@ export default function ProjectPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b px-6">
+      <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-6">
         <div className="max-w-7xl mx-auto flex">
           {(['request', 'plan', 'draft', 'assets', 'preview'] as TabType[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition ${activeTab === tab
-                ? 'border-red-800 text-red-800'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-red-800 text-red-800 dark:text-red-400 dark:border-red-400'
+                : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                 }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -685,24 +950,52 @@ export default function ProjectPage() {
 
           {/* Draft Tab */}
           {activeTab === 'draft' && (
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="space-y-4">
               {project.markdown ? (
-                <div className="space-y-4">
-                  <textarea
-                    value={editedMarkdown}
-                    onChange={(e) => setEditedMarkdown(e.target.value)}
-                    rows={30}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                  <button
-                    onClick={handleSaveMarkdown}
-                    className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition"
-                  >
-                    Save Changes
-                  </button>
-                </div>
+                <>
+                  {/* Section Navigation */}
+                  {markdownSections.length > 0 && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Sections (click to regenerate)</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {markdownSections.map((section, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setSectionModal({ isOpen: true, sectionHeading: section.heading });
+                              setSectionFeedback('');
+                            }}
+                            disabled={pipeline.step !== 'idle'}
+                            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            style={{ paddingLeft: `${(section.level - 1) * 8 + 12}px` }}
+                          >
+                            {'#'.repeat(section.level)} {section.heading}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Editor */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                    <div className="space-y-4">
+                      <textarea
+                        value={editedMarkdown}
+                        onChange={(e) => setEditedMarkdown(e.target.value)}
+                        rows={30}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                      />
+                      <button
+                        onClick={handleSaveMarkdown}
+                        className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                </>
               ) : (
-                <div className="text-center py-12 text-gray-500">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center text-gray-500 dark:text-gray-400">
                   <p>No draft generated yet.</p>
                   <p className="text-sm mt-2">Click &quot;Generate Draft&quot; to create document content.</p>
                 </div>
@@ -713,6 +1006,55 @@ export default function ProjectPage() {
           {/* Assets Tab */}
           {activeTab === 'assets' && (
             <div className="space-y-6">
+              {/* Asset Filter Buttons and Actions */}
+              {project.assets.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      for (const asset of project.assets) {
+                        if (asset.urls[0]) {
+                          const link = document.createElement('a');
+                          link.href = asset.urls[0];
+                          link.download = `${asset.purpose.replace(/\s+/g, '_')}.png`;
+                          link.click();
+                          await new Promise(r => setTimeout(r, 300)); // Small delay between downloads
+                        }
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-full text-sm font-medium bg-green-600 text-white hover:bg-green-500 transition"
+                  >
+                    Download All ({project.assets.length})
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  {(['all', 'portraits', 'maps', 'items', 'scenes'] as const).map(filter => (
+                    <button
+                      key={filter}
+                      onClick={() => setAssetFilter(filter)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                        assetFilter === filter
+                          ? 'bg-red-800 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                      <span className="ml-1 text-xs opacity-75">
+                        ({filter === 'all'
+                          ? project.assets.length
+                          : project.assets.filter(a => {
+                              const p = a.purpose.toLowerCase();
+                              if (filter === 'portraits') return p.includes('portrait') || p.includes('npc') || p.includes('character');
+                              if (filter === 'maps') return a.isMap || p.includes('map');
+                              if (filter === 'items') return p.includes('item') || p.includes('weapon') || p.includes('armor') || p.includes('artifact');
+                              if (filter === 'scenes') return p.includes('scene') || p.includes('location') || p.includes('illustration');
+                              return false;
+                            }).length
+                        })
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {pendingMapApprovals.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <h3 className="font-bold text-amber-900 mb-2">Maps Awaiting Review</h3>
@@ -732,7 +1074,8 @@ export default function ProjectPage() {
                           <img
                             src={asset.previewUrl}
                             alt={asset.purpose}
-                            className="w-full rounded mb-3"
+                            className="w-full rounded mb-3 cursor-pointer hover:opacity-90"
+                            onClick={() => setLightbox({ isOpen: true, imageUrl: asset.previewUrl!, assetPurpose: asset.purpose })}
                           />
                         )}
                         <div className="flex gap-2">
@@ -741,21 +1084,21 @@ export default function ProjectPage() {
                             disabled={pipeline.step !== 'idle'}
                             className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
                           >
-                            ✓ Approve
+                            Approve
                           </button>
                           <button
                             onClick={() => handleFinalizeMap(asset.id)}
                             disabled={pipeline.step !== 'idle'}
                             className="flex-1 px-3 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
                           >
-                            ★ Finalize Pro
+                            Finalize Pro
                           </button>
                           <button
                             onClick={() => setFeedbackModal({ assetId: asset.id, isOpen: true })}
                             disabled={pipeline.step !== 'idle'}
                             className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
                           >
-                            ✎ Feedback
+                            Feedback
                           </button>
                         </div>
                       </div>
@@ -766,10 +1109,13 @@ export default function ProjectPage() {
 
               {project.assets.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {project.assets.map(asset => (
+                  {getFilteredAssets().map(asset => (
                     <div key={asset.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       {asset.urls[0] && (
-                        <div className="bg-gray-100 p-2">
+                        <div
+                          className="bg-gray-100 p-2 cursor-pointer hover:bg-gray-200 transition"
+                          onClick={() => setLightbox({ isOpen: true, imageUrl: asset.urls[0], assetPurpose: asset.purpose })}
+                        >
                           <img
                             src={asset.urls[0]}
                             alt={asset.purpose}
@@ -777,6 +1123,29 @@ export default function ProjectPage() {
                           />
                         </div>
                       )}
+
+                      {/* Variations Preview */}
+                      {asset.allVariations && asset.allVariations.length > 1 && (
+                        <div className="px-2 py-2 bg-gray-50 border-t">
+                          <div className="text-xs text-gray-500 mb-1">Variations ({asset.allVariations.length}):</div>
+                          <div className="flex gap-1 overflow-x-auto">
+                            {asset.allVariations.map((url, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleSelectVariation(asset.id, idx)}
+                                className={`flex-shrink-0 w-12 h-12 rounded border-2 overflow-hidden transition ${
+                                  asset.selectedVariationIndex === idx
+                                    ? 'border-red-500'
+                                    : 'border-transparent hover:border-gray-400'
+                                }`}
+                              >
+                                <img src={url} alt={`Variation ${idx + 1}`} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="p-4">
                         <div className="font-medium text-gray-900">{asset.purpose}</div>
                         <div className="text-sm text-gray-500 mt-1">
@@ -793,6 +1162,63 @@ export default function ProjectPage() {
                           {asset.model}
                         </div>
                         <div className="text-xs text-gray-400 mt-2 line-clamp-2">{asset.prompt}</div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                          <button
+                            onClick={() => handleQuickRegenerate(asset.id)}
+                            disabled={pipeline.step !== 'idle'}
+                            className="flex-1 px-2 py-1.5 bg-gray-100 text-gray-700 rounded text-xs font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            title="Regenerate with same prompt"
+                          >
+                            Regenerate
+                          </button>
+                          <button
+                            onClick={() => openAssetEditModal(asset.id, 'edit')}
+                            disabled={pipeline.step !== 'idle'}
+                            className="flex-1 px-2 py-1.5 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            title="Edit prompt and regenerate"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openAssetEditModal(asset.id, 'variations')}
+                            disabled={pipeline.step !== 'idle'}
+                            className="flex-1 px-2 py-1.5 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            title="Generate multiple variations"
+                          >
+                            Variations
+                          </button>
+                          <a
+                            href={asset.urls[0]}
+                            download={`${asset.purpose.replace(/\s+/g, '_')}.png`}
+                            className="px-2 py-1.5 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition"
+                            title="Download image"
+                          >
+                            Download
+                          </a>
+                        </div>
+
+                        {/* Version History */}
+                        {asset.previousVersions && asset.previousVersions.length > 0 && (
+                          <details className="mt-2">
+                            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
+                              History ({asset.previousVersions.length} previous)
+                            </summary>
+                            <div className="mt-1 flex gap-1 overflow-x-auto py-1">
+                              {asset.previousVersions.slice(-5).map((version, idx) => (
+                                <img
+                                  key={idx}
+                                  src={version.url}
+                                  alt={`Previous version ${idx + 1}`}
+                                  className="w-10 h-10 rounded object-cover cursor-pointer hover:ring-2 ring-gray-400"
+                                  onClick={() => setLightbox({ isOpen: true, imageUrl: version.url, assetPurpose: `${asset.purpose} (previous)` })}
+                                  title={new Date(version.timestamp).toLocaleString()}
+                                />
+                              ))}
+                            </div>
+                          </details>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -885,6 +1311,255 @@ export default function ProjectPage() {
                   setFeedbackModal({ assetId: '', isOpen: false });
                   setFeedbackText('');
                 }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Asset Edit Modal */}
+      {assetEditModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              {assetEditModal.mode === 'variations' ? 'Generate Variations' : 'Edit & Regenerate'}
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Image Prompt
+                </label>
+                <textarea
+                  value={editPrompt}
+                  onChange={(e) => setEditPrompt(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Aspect Ratio
+                </label>
+                <select
+                  value={editAspectRatio}
+                  onChange={(e) => setEditAspectRatio(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Default</option>
+                  <option value="1:1">Square (1:1)</option>
+                  <option value="3:4">Portrait (3:4)</option>
+                  <option value="4:3">Landscape (4:3)</option>
+                  <option value="16:9">Wide (16:9)</option>
+                  <option value="9:16">Tall (9:16)</option>
+                  <option value="21:9">Ultra-wide (21:9)</option>
+                </select>
+              </div>
+
+              {assetEditModal.mode === 'variations' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Number of Variations
+                  </label>
+                  <div className="flex gap-2">
+                    {[2, 3, 4].map(num => (
+                      <button
+                        key={num}
+                        onClick={() => setNumVariations(num)}
+                        className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
+                          numVariations === num
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {num} images
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleRegenerateAsset}
+                disabled={pipeline.step !== 'idle'}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+              >
+                {assetEditModal.mode === 'variations' ? `Generate ${numVariations} Variations` : 'Regenerate'}
+              </button>
+              <button
+                onClick={() => {
+                  setAssetEditModal({ assetId: '', isOpen: false, mode: 'edit' });
+                  setEditPrompt('');
+                  setEditAspectRatio('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {lightbox.isOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 cursor-pointer"
+          onClick={() => setLightbox({ isOpen: false, imageUrl: '', assetPurpose: '' })}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightbox.imageUrl}
+              alt={lightbox.assetPurpose}
+              className="max-w-full max-h-[85vh] object-contain"
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white p-3 flex justify-between items-center">
+              <span className="text-sm">{lightbox.assetPurpose}</span>
+              <a
+                href={lightbox.imageUrl}
+                download={`${lightbox.assetPurpose.replace(/\s+/g, '_')}.png`}
+                className="px-3 py-1 bg-white text-black rounded text-sm font-medium hover:bg-gray-200 transition"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Download
+              </a>
+            </div>
+            <button
+              onClick={() => setLightbox({ isOpen: false, imageUrl: '', assetPurpose: '' })}
+              className="absolute top-2 right-2 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition text-xl"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Section Regeneration Modal */}
+      {sectionModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
+              Regenerate Section: {sectionModal.sectionHeading}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Optionally provide feedback to guide the regeneration. Leave empty to regenerate with fresh content.
+            </p>
+            <textarea
+              value={sectionFeedback}
+              onChange={(e) => setSectionFeedback(e.target.value)}
+              placeholder="e.g., Make this section more dramatic, add more detail about the NPC's motivations, include a read-aloud box..."
+              className="w-full h-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={handleRegenerateSection}
+                disabled={pipeline.step !== 'idle'}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+              >
+                Regenerate
+              </button>
+              <button
+                onClick={() => {
+                  setSectionModal({ isOpen: false, sectionHeading: '' });
+                  setSectionFeedback('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Keyboard Shortcuts</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Navigate tabs</span>
+                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">1-5</kbd>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Generate next step</span>
+                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Cmd/Ctrl + G</kbd>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Build preview</span>
+                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Cmd/Ctrl + B</kbd>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Export PDF</span>
+                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Cmd/Ctrl + E</kbd>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Close modal</span>
+                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Esc</kbd>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Show this help</span>
+                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">?</kbd>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowShortcuts(false)}
+              className="mt-6 w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Export Format Modal */}
+      {exportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Export PDF</h3>
+            <p className="text-sm text-gray-600 mb-4">Choose a page format for your PDF:</p>
+
+            <div className="space-y-2">
+              {([
+                { value: 'Letter', label: 'Letter (8.5" x 11")', desc: 'US standard' },
+                { value: 'A4', label: 'A4 (210mm x 297mm)', desc: 'International standard' },
+                { value: 'A5', label: 'A5 (148mm x 210mm)', desc: 'Half A4, compact' },
+                { value: 'Digest', label: 'Digest (5.5" x 8.5")', desc: 'RPG book size' },
+              ] as const).map(format => (
+                <button
+                  key={format.value}
+                  onClick={() => setExportFormat(format.value)}
+                  className={`w-full text-left px-4 py-3 rounded-lg border-2 transition ${
+                    exportFormat === format.value
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-medium">{format.label}</div>
+                  <div className="text-xs text-gray-500">{format.desc}</div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={doExportPdf}
+                className="flex-1 px-4 py-2 bg-red-800 text-white rounded-md hover:bg-red-700 transition font-medium"
+              >
+                Export PDF
+              </button>
+              <button
+                onClick={() => setExportModal(false)}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
               >
                 Cancel

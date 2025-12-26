@@ -22,6 +22,13 @@ Rules:
 - For maps (isMap: true), provide detailed promptSeed for visual generation
 - Be thorough but focused on what the user requested
 
+IMPORTANT - Asset Plan Requirements:
+- Generate an image asset for EVERY monster in the monsters list
+- Generate a portrait asset for EVERY major NPC in the npcs list
+- Generate at least one location illustration for key locations
+- Generate at least one map if the content involves exploration or combat areas
+- Each asset must have a unique ID that matches the entity it represents (e.g., monster "shadow_drake" should have asset "shadow_drake_image")
+
 Response format:
 {
   "title": "string",
@@ -56,14 +63,22 @@ Response format:
   },
   "assetPlan": [
     {
-      "id": "asset_id",
-      "purpose": "What this image is for (e.g., 'Town Map', 'NPC Portrait')",
+      "id": "npc_portrait_id",
+      "purpose": "Portrait of major NPC",
       "promptSeed": "Detailed visual description for image generation",
-      "aspectRatio": "landscape_16_9 or square or portrait_4_3",
+      "aspectRatio": "portrait_4_3",
       "isMap": false
+    },
+    {
+      "id": "location_map_id",
+      "purpose": "Map of the location",
+      "promptSeed": "Top-down map of the area showing key features, entrances, and points of interest",
+      "aspectRatio": "landscape_16_9",
+      "isMap": true
     }
   ]
 }`;
+
 
 function validateDocPlan(data: unknown): DocPlan | null {
   if (!data || typeof data !== 'object') return null;
@@ -90,10 +105,10 @@ function validateDocPlan(data: unknown): DocPlan | null {
       wordCount: typeof section.wordCount === 'number' ? section.wordCount : 500,
       subsections: Array.isArray(section.subsections)
         ? section.subsections.map((sub: Record<string, unknown>) => ({
-            id: String(sub.id || ''),
-            heading: String(sub.heading || ''),
-            wordCount: typeof sub.wordCount === 'number' ? sub.wordCount : 200,
-          }))
+          id: String(sub.id || ''),
+          heading: String(sub.heading || ''),
+          wordCount: typeof sub.wordCount === 'number' ? sub.wordCount : 200,
+        }))
         : undefined,
     });
   }
@@ -103,56 +118,56 @@ function validateDocPlan(data: unknown): DocPlan | null {
   const entityRegistry: EntityRegistry = {
     npcs: Array.isArray(er.npcs)
       ? er.npcs.map((e: Record<string, unknown>) => ({
-          id: String(e.id || ''),
-          name: String(e.name || ''),
-          summary: String(e.summary || ''),
-          crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
-        }))
+        id: String(e.id || ''),
+        name: String(e.name || ''),
+        summary: String(e.summary || ''),
+        crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
+      }))
       : [],
     factions: Array.isArray(er.factions)
       ? er.factions.map((e: Record<string, unknown>) => ({
-          id: String(e.id || ''),
-          name: String(e.name || ''),
-          summary: String(e.summary || ''),
-          crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
-        }))
+        id: String(e.id || ''),
+        name: String(e.name || ''),
+        summary: String(e.summary || ''),
+        crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
+      }))
       : [],
     locations: Array.isArray(er.locations)
       ? er.locations.map((e: Record<string, unknown>) => ({
-          id: String(e.id || ''),
-          name: String(e.name || ''),
-          summary: String(e.summary || ''),
-          crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
-        }))
+        id: String(e.id || ''),
+        name: String(e.name || ''),
+        summary: String(e.summary || ''),
+        crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
+      }))
       : [],
     monsters: Array.isArray(er.monsters)
       ? er.monsters.map((e: Record<string, unknown>) => ({
-          id: String(e.id || ''),
-          name: String(e.name || ''),
-          summary: String(e.summary || ''),
-          crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
-        }))
+        id: String(e.id || ''),
+        name: String(e.name || ''),
+        summary: String(e.summary || ''),
+        crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
+      }))
       : [],
     items: Array.isArray(er.items)
       ? er.items.map((e: Record<string, unknown>) => ({
-          id: String(e.id || ''),
-          name: String(e.name || ''),
-          summary: String(e.summary || ''),
-          rarity: typeof e.rarity === 'string' ? e.rarity : undefined,
-          crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
-        }))
+        id: String(e.id || ''),
+        name: String(e.name || ''),
+        summary: String(e.summary || ''),
+        rarity: typeof e.rarity === 'string' ? e.rarity : undefined,
+        crossLinks: Array.isArray(e.crossLinks) ? e.crossLinks.map(String) : [],
+      }))
       : [],
   };
 
   // Validate asset plan
   const assetPlan: AssetPlanEntry[] = Array.isArray(plan.assetPlan)
     ? plan.assetPlan.map((a: Record<string, unknown>) => ({
-        id: String(a.id || crypto.randomUUID()),
-        purpose: String(a.purpose || ''),
-        promptSeed: String(a.promptSeed || ''),
-        aspectRatio: typeof a.aspectRatio === 'string' ? a.aspectRatio : undefined,
-        isMap: Boolean(a.isMap),
-      }))
+      id: String(a.id || crypto.randomUUID()),
+      purpose: String(a.purpose || ''),
+      promptSeed: String(a.promptSeed || ''),
+      aspectRatio: typeof a.aspectRatio === 'string' ? a.aspectRatio : undefined,
+      isMap: Boolean(a.isMap),
+    }))
     : [];
 
   return {
@@ -165,12 +180,46 @@ function validateDocPlan(data: unknown): DocPlan | null {
   };
 }
 
+// Context options for plan generation
+export interface PlanContext {
+  partyLevel?: number;
+  partySize?: number;
+  worldDescription?: string;
+  campaignNotes?: string;
+  customInstructions?: string;
+}
+
 export async function generatePlan(
   apiKey: string,
   modelId: string,
   userRequest: string,
-  docType?: string
+  docType?: string,
+  context?: PlanContext
 ): Promise<DocPlan> {
+  // Build context section if provided
+  let contextSection = '';
+  if (context) {
+    const contextParts: string[] = [];
+    if (context.partyLevel) {
+      contextParts.push(`Party Level: ${context.partyLevel}`);
+    }
+    if (context.partySize) {
+      contextParts.push(`Party Size: ${context.partySize} players`);
+    }
+    if (context.worldDescription) {
+      contextParts.push(`World/Setting: ${context.worldDescription}`);
+    }
+    if (context.campaignNotes) {
+      contextParts.push(`Campaign Notes: ${context.campaignNotes}`);
+    }
+    if (context.customInstructions) {
+      contextParts.push(`Special Instructions: ${context.customInstructions}`);
+    }
+    if (contextParts.length > 0) {
+      contextSection = `\n\nCampaign Context:\n${contextParts.join('\n')}`;
+    }
+  }
+
   const messages: ChatMessage[] = [
     { role: 'system', content: PLAN_SYSTEM_PROMPT },
     {
@@ -178,7 +227,7 @@ export async function generatePlan(
       content: `Create a document plan for the following D&D content request:
 
 User Request: ${userRequest}
-${docType ? `Document Type: ${docType}` : ''}
+${docType ? `Document Type: ${docType}` : ''}${contextSection}
 
 Available image generation tools:
 - create_image_z: Text-to-image generation (portraits, illustrations, icons)
@@ -194,3 +243,4 @@ Respond with ONLY the JSON plan, no other text.`,
 
   return chatCompletionJson<DocPlan>(apiKey, modelId, messages, validateDocPlan);
 }
+

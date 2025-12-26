@@ -4,6 +4,23 @@ import { marked } from 'marked';
 import { Asset, StatBlock } from '../types';
 import { parseStatBlock } from './draft';
 
+// Pre-process markdown to replace asset: URLs with actual image URLs
+function replaceAssetUrls(markdown: string, assetMap: Map<string, Asset>): string {
+  // Replace ![alt](asset:id) with ![alt](actual_url) or error message
+  return markdown.replace(/!\[([^\]]*)\]\(asset:([^)]+)\)/g, (match, alt, assetId) => {
+    const asset = assetMap.get(assetId);
+    if (asset && asset.urls.length > 0) {
+      const url = asset.urls[0];
+      // Add a data attribute to mark maps for special styling
+      if (asset.isMap) {
+        return `<figure class="dnd-figure dnd-map-full"><img src="${url}" alt="${alt}" />${alt ? `<figcaption>${alt}</figcaption>` : ''}</figure>`;
+      }
+      return `<figure class="dnd-figure"><img src="${url}" alt="${alt}" />${alt ? `<figcaption>${alt}</figcaption>` : ''}</figure>`;
+    }
+    return `<div class="missing-asset">[Missing Asset: ${assetId}]</div>`;
+  });
+}
+
 // Custom renderer for D&D-style output
 export function renderToHtml(
   markdown: string,
@@ -19,77 +36,75 @@ export function renderToHtml(
     assetMap.set(asset.id, asset);
   }
 
-  // Pre-process custom blocks
-  const processed = preprocessCustomBlocks(markdown);
+  // Step 1: Replace asset: URLs with actual URLs FIRST
+  let processed = replaceAssetUrls(markdown, assetMap);
 
-  // Configure marked with custom renderer
-  // Using type assertions to handle marked's complex types
-  const renderer = new marked.Renderer();
+  // Step 2: Pre-process custom blocks
+  processed = preprocessCustomBlocks(processed);
 
-  // Custom image renderer to handle asset: URLs
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (renderer as any).image = (token: { href: string; title: string | null; text: string }) => {
-    let src = token.href;
-    let width = '';
-    let height = '';
-
-    if (token.href.startsWith('asset:')) {
-      const assetId = token.href.slice(6);
-      const asset = assetMap.get(assetId);
-      if (asset && asset.urls.length > 0) {
-        src = asset.urls[0];
-        if (asset.width) width = `width="${asset.width}"`;
-        if (asset.height) height = `height="${asset.height}"`;
-      } else {
-        return `<div class="missing-asset">[Missing Asset: ${assetId}]</div>`;
-      }
-    }
-
-    return `<figure class="dnd-figure">
-      <img src="${src}" alt="${token.text}" ${width} ${height} ${token.title ? `title="${token.title}"` : ''} />
-      ${token.text ? `<figcaption>${token.text}</figcaption>` : ''}
-    </figure>`;
-  };
-
-  // Custom heading renderer with drop cap support
+  // Step 3: Configure marked for D&D styling
+  // Track first paragraph for drop caps
   let isFirstParagraph = true;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (renderer as any).heading = (token: { text: string; depth: number }) => {
-    isFirstParagraph = true;
-    const id = String(token.text).toLowerCase().replace(/[^\w]+/g, '-');
-    const classes = token.depth === 1 ? 'dnd-title' : token.depth === 2 ? 'dnd-section' : 'dnd-subsection';
-    return `<h${token.depth} id="${id}" class="${classes}">${token.text}</h${token.depth}>\n`;
-  };
 
-  // Custom paragraph with first-paragraph detection for drop caps
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (renderer as any).paragraph = (token: { text: string }) => {
-    const text = String(token.text);
-    // Check if this should have a drop cap (first letter of first paragraph after a heading)
-    if (isFirstParagraph && text.length > 0) {
-      isFirstParagraph = false;
-      const firstLetter = text.charAt(0);
-      const rest = text.slice(1);
-      return `<p class="first-paragraph"><span class="drop-cap">${firstLetter}</span>${rest}</p>\n`;
-    }
-    return `<p>${text}</p>\n`;
-  };
+  marked.use({
+    renderer: {
+      // Custom heading renderer with drop cap support
+      heading(token: { text: string; depth: number }) {
+        isFirstParagraph = true;
+        const { text, depth } = token;
+        const id = String(text).toLowerCase().replace(/[^\w]+/g, '-');
+        const classes = depth === 1 ? 'dnd-title' : depth === 2 ? 'dnd-section' : 'dnd-subsection';
+        // Parse inline markdown for bold/italic/links
+        const parsedText = marked.parseInline(text) as string;
+        return `<h${depth} id="${id}" class="${classes}">${parsedText}</h${depth}>\n`;
+      },
 
-  // Custom table renderer
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (renderer as any).table = (token: { header: string; rows: string[][] }) => {
-    // marked v17+ uses a different token structure
-    const headerHtml = token.header || '';
-    const bodyHtml = Array.isArray(token.rows)
-      ? token.rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')
-      : '';
-    return `<table class="dnd-table">
-      <thead>${headerHtml}</thead>
-      <tbody>${bodyHtml}</tbody>
-    </table>\n`;
-  };
+      // Custom paragraph with first-paragraph detection for drop caps
+      paragraph(token: { text: string }) {
+        const text = token.text;
+        const textStr = String(text);
+        // Parse inline markdown for bold/italic/links
+        const parsedText = marked.parseInline(textStr) as string;
 
-  marked.setOptions({ renderer });
+        // Skip drop cap if starts with HTML (like a figure tag from an image)
+        if (isFirstParagraph && parsedText.length > 0 && !parsedText.startsWith('<')) {
+          isFirstParagraph = false;
+          // We need to find the first actual character for the drop cap, 
+          // skip tags if they was added by parseInline (unlikely at start of p, but safe)
+          const firstLetter = parsedText.charAt(0);
+          const rest = parsedText.slice(1);
+          return `<p class="first-paragraph"><span class="drop-cap">${firstLetter}</span>${rest}</p>\n`;
+        }
+        return `<p>${parsedText}</p>\n`;
+      },
+
+      // Custom table renderer - marked v17 uses TableCell objects
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      table(token: any) {
+        const headerCells = Array.isArray(token.header)
+          ? token.header.map((cell: { text: string }) => {
+            const parsed = marked.parseInline(cell.text || '') as string;
+            return `<th>${parsed}</th>`;
+          }).join('')
+          : '';
+        const headerHtml = headerCells ? `<tr>${headerCells}</tr>` : '';
+
+        const bodyHtml = Array.isArray(token.rows)
+          ? token.rows.map((row: Array<{ text: string }>) =>
+            `<tr>${row.map(cell => {
+              const parsed = marked.parseInline(cell.text || '') as string;
+              return `<td>${parsed}</td>`;
+            }).join('')}</tr>`
+          ).join('')
+          : '';
+
+        return `<table class="dnd-table">
+          <thead>${headerHtml}</thead>
+          <tbody>${bodyHtml}</tbody>
+        </table>\n`;
+      },
+    },
+  });
 
   const htmlContent = marked.parse(processed) as string;
 
@@ -120,19 +135,30 @@ export function renderToHtml(
 function preprocessCustomBlocks(markdown: string): string {
   let result = markdown;
 
+  // Helper to process content - use parseInline for inline formatting (bold, italic)
+  // Images are already converted to HTML by replaceAssetUrls
+  const processBlockContent = (content: string): string => {
+    const trimmed = content.trim();
+    // Parse inline markdown for bold/italic/links
+    return marked.parseInline(trimmed) as string;
+  };
+
   // Process :::readaloud blocks
   result = result.replace(/:::readaloud\n([\s\S]*?)\n:::/g, (_, content) => {
-    return `<div class="read-aloud">${content.trim()}</div>`;
+    const parsed = processBlockContent(content);
+    return `<div class="read-aloud">${parsed}</div>`;
   });
 
   // Process :::note blocks
   result = result.replace(/:::note\n([\s\S]*?)\n:::/g, (_, content) => {
-    return `<div class="dnd-note">${content.trim()}</div>`;
+    const parsed = processBlockContent(content);
+    return `<div class="dnd-note">${parsed}</div>`;
   });
 
   // Process :::warning blocks
   result = result.replace(/:::warning\n([\s\S]*?)\n:::/g, (_, content) => {
-    return `<div class="dnd-warning">${content.trim()}</div>`;
+    const parsed = processBlockContent(content);
+    return `<div class="dnd-warning">${parsed}</div>`;
   });
 
   // Process :::statblock blocks
@@ -296,8 +322,33 @@ body {
 
 .two-column .dnd-content {
   column-count: 2;
-  column-gap: 0.5in;
+  column-gap: 0.4in;
   column-rule: 1px solid var(--dnd-gold);
+  column-fill: balance;
+}
+
+/* Print-specific page layout */
+@page {
+  size: letter;
+  margin: 0.75in;
+}
+
+@media print {
+  body {
+    background: white;
+  }
+  
+  .dnd-content {
+    box-shadow: none;
+    padding: 0;
+    max-width: none;
+  }
+  
+  .two-column .dnd-content {
+    column-count: 2;
+    column-gap: 0.4in;
+    column-fill: balance;
+  }
 }
 
 /* Headings */
@@ -431,7 +482,10 @@ h4, h5, h6 {
 
 .dnd-figure img {
   max-width: 100%;
+  max-height: 250px;
+  width: auto;
   height: auto;
+  object-fit: contain;
   border: 2px solid var(--dnd-gold);
   box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
 }
@@ -441,6 +495,18 @@ h4, h5, h6 {
   font-size: 9pt;
   color: #666;
   margin-top: 0.3em;
+}
+
+/* Full-width maps that span columns */
+.dnd-map-full {
+  column-span: all;
+  margin: 1.5em 0;
+}
+
+.dnd-map-full img {
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
 }
 
 /* Stat Block */

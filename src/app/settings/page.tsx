@@ -103,8 +103,114 @@ export default function SettingsPage() {
             onSelect={(modelId) => setSettings({ ...settings, defaultModelId: modelId })}
           />
 
+          {/* Shared Context / Campaign Defaults */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaign Defaults</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This context is automatically included in all generations across all projects.
+            </p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="party-level" className="block text-sm font-medium text-gray-700 mb-1">
+                    Default Party Level
+                  </label>
+                  <select
+                    id="party-level"
+                    value={settings.sharedContext?.defaultPartyLevel || 5}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      sharedContext: {
+                        ...settings.sharedContext,
+                        defaultPartyLevel: parseInt(e.target.value),
+                        defaultPartySize: settings.sharedContext?.defaultPartySize || 4,
+                        worldDescription: settings.sharedContext?.worldDescription || '',
+                        customInstructions: settings.sharedContext?.customInstructions || '',
+                      }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map(level => (
+                      <option key={level} value={level}>Level {level}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="party-size" className="block text-sm font-medium text-gray-700 mb-1">
+                    Default Party Size
+                  </label>
+                  <select
+                    id="party-size"
+                    value={settings.sharedContext?.defaultPartySize || 4}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      sharedContext: {
+                        ...settings.sharedContext,
+                        defaultPartySize: parseInt(e.target.value),
+                        defaultPartyLevel: settings.sharedContext?.defaultPartyLevel || 5,
+                        worldDescription: settings.sharedContext?.worldDescription || '',
+                        customInstructions: settings.sharedContext?.customInstructions || '',
+                      }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    {Array.from({ length: 8 }, (_, i) => i + 1).map(size => (
+                      <option key={size} value={size}>{size} players</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="world-description" className="block text-sm font-medium text-gray-700 mb-1">
+                  World/Setting Description
+                </label>
+                <textarea
+                  id="world-description"
+                  value={settings.sharedContext?.worldDescription || ''}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    sharedContext: {
+                      ...settings.sharedContext,
+                      worldDescription: e.target.value,
+                      defaultPartyLevel: settings.sharedContext?.defaultPartyLevel || 5,
+                      defaultPartySize: settings.sharedContext?.defaultPartySize || 4,
+                      customInstructions: settings.sharedContext?.customInstructions || '',
+                    }
+                  })}
+                  placeholder="e.g., Forgotten Realms, high magic setting. Sword Coast region. Year 1492 DR..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 h-24 resize-none"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="custom-instructions" className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Generation Instructions
+                </label>
+                <textarea
+                  id="custom-instructions"
+                  value={settings.sharedContext?.customInstructions || ''}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    sharedContext: {
+                      ...settings.sharedContext,
+                      customInstructions: e.target.value,
+                      defaultPartyLevel: settings.sharedContext?.defaultPartyLevel || 5,
+                      defaultPartySize: settings.sharedContext?.defaultPartySize || 4,
+                      worldDescription: settings.sharedContext?.worldDescription || '',
+                    }
+                  })}
+                  placeholder="e.g., Always include RP opportunities. Favor non-combat solutions. Include loot tables..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 h-24 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Save Button */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 border-t border-gray-200 pt-6">
             <button
               onClick={handleSave}
               className="px-6 py-2 bg-red-800 text-white rounded-md hover:bg-red-700 transition font-medium"

@@ -1,10 +1,19 @@
 // Core Types for D&D PDF Studio
 
+// Shared context that applies to all projects
+export interface SharedContext {
+  worldDescription: string;  // e.g., "Forgotten Realms, high magic setting"
+  defaultPartyLevel: number;
+  defaultPartySize: number;
+  customInstructions: string;  // Custom instructions for LLM
+}
+
 // Settings stored in localStorage
 export interface AppSettings {
   openRouterApiKey: string;
   falApiKey: string;
   defaultModelId: string;
+  sharedContext?: SharedContext;
 }
 
 // OpenRouter Model
@@ -29,7 +38,8 @@ export interface Asset {
   width?: number;
   height?: number;
   isMap?: boolean;
-  mapStatus?: 'preview' | 'approved' | 'pro-generated';
+  mapStatus?: 'preview' | 'approved' | 'finalized';
+  mapFeedback?: string;  // User feedback for revision
   previewUrl?: string;
   createdAt: string;
 }
@@ -141,6 +151,22 @@ export interface DocPlan {
   assetPlan: AssetPlanEntry[];
 }
 
+// Per-project context for campaign details
+export interface ProjectContext {
+  partyLevel?: number;
+  partySize?: number;
+  campaignNotes?: string;
+  attachedFiles?: AttachedFile[];
+}
+
+// Attached file (stored as base64)
+export interface AttachedFile {
+  name: string;
+  type: string;  // MIME type
+  content: string;  // base64 content or extracted text
+  extractedText?: string;
+}
+
 // Project
 export interface Project {
   id: string;
@@ -150,8 +176,18 @@ export interface Project {
   docPlan?: DocPlan;
   markdown?: string;
   assets: Asset[];
+  context?: ProjectContext;
+  referenceAssets?: ReferenceAsset[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Reference asset for character consistency
+export interface ReferenceAsset {
+  id: string;
+  name: string;
+  imageUrl: string;  // base64 or URL
+  description: string;
 }
 
 // Tool definitions for OpenRouter

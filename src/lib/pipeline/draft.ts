@@ -114,20 +114,23 @@ ${s.subsections ? s.subsections.map(sub => `  - ${sub.heading} (${sub.id}): ~${s
 
 ${entitySummary}
 
-## Asset References
+## Asset References - USE THESE EXACT IDs
 
-Use these asset IDs for image placeholders:
-${docPlan.assetPlan.map(a => `- ${a.id}: ${a.purpose}`).join('\n')}
+You MUST use these exact asset IDs when placing images. Use the format: ![Description](asset:EXACT_ID_HERE)
+
+${docPlan.assetPlan.map(a => `- ID: "${a.id}" → ${a.purpose}${a.isMap ? ' [MAP]' : ''}`).join('\n')}
 
 ---
 
 Now write the complete document with all sections. Include:
 - Evocative descriptions
-- Practical DM notes in :::note boxes
+- Practical DM notes in :::note boxes (use **bold** for emphasis)
 - Read-aloud text in :::readaloud boxes
 - Full stat blocks for any monsters using the :::statblock format
 - Magic item descriptions with proper formatting
-- Image placeholders using ![Description](asset:asset_id) syntax
+- Image placeholders using ![Description](asset:exact_asset_id) syntax - use the EXACT IDs from the asset list above
+
+IMPORTANT: When placing monster or NPC images, use the corresponding asset ID from the list above. For maps, place them prominently at the start of relevant sections.
 
 Write the full markdown document now:`,
     },

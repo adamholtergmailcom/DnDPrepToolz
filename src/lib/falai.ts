@@ -180,3 +180,77 @@ export async function removeBackground(apiKey: string, input: RembgInput): Promi
 
   return response.json();
 }
+
+// Text-to-image with nano-banana (regular, for previews)
+export interface NanoBananaInput {
+  prompt: string;
+  aspect_ratio?: '21:9' | '16:9' | '3:2' | '4:3' | '5:4' | '1:1' | '4:5' | '3:4' | '2:3' | '9:16';
+  num_images?: number;
+  output_format?: 'jpeg' | 'png' | 'webp';
+}
+
+export async function generateImageBanana(apiKey: string, input: NanoBananaInput): Promise<NanoBananaOutput> {
+  const response = await fetch('https://fal.run/fal-ai/nano-banana', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt: input.prompt,
+      aspect_ratio: input.aspect_ratio || '16:9',
+      num_images: input.num_images || 1,
+      output_format: input.output_format || 'png',
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`fal.ai nano-banana error: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
+}
+
+// Image upscaling with SeedVR2
+export interface SeedVRUpscaleInput {
+  image_url: string;
+  upscale_mode?: 'target' | 'factor';
+  upscale_factor?: number;
+  target_resolution?: '720p' | '1080p' | '1440p' | '2160p';
+  output_format?: 'png' | 'jpg' | 'webp';
+}
+
+export interface SeedVRUpscaleOutput {
+  image: {
+    url: string;
+    content_type: string;
+    width?: number;
+    height?: number;
+  };
+  seed: number;
+}
+
+export async function upscaleImageSeedVR(apiKey: string, input: SeedVRUpscaleInput): Promise<SeedVRUpscaleOutput> {
+  const response = await fetch('https://fal.run/fal-ai/seedvr/upscale/image', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      image_url: input.image_url,
+      upscale_mode: input.upscale_mode || 'target',
+      upscale_factor: input.upscale_factor,
+      target_resolution: input.target_resolution || '2160p',
+      output_format: input.output_format || 'png',
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`fal.ai seedvr upscale error: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
+}

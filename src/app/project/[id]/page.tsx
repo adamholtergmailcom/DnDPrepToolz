@@ -3,14 +3,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Project, Asset, PipelineState } from '@/lib/types';
+import dynamic from 'next/dynamic';
+import { Project, PipelineState } from '@/lib/types';
 import { getProject, saveProject } from '@/lib/db';
 import { getSettings } from '@/lib/storage';
 import { generatePlan } from '@/lib/pipeline/plan';
 import { generateDraft } from '@/lib/pipeline/draft';
-import { generateAllAssets } from '@/lib/pipeline/assets';
+import { generateAllAssets, approveMap, reviseMapWithFeedback, finalizeMapWithPro } from '@/lib/pipeline/assets';
 import { renderToHtml } from '@/lib/pipeline/render';
-import { editImageBananaPro } from '@/lib/falai';
+
+// Dynamic import for PageFlipper to avoid SSR issues
+const PageFlipper = dynamic(() => import('@/components/PageFlipper'), {
+  ssr: false,
+  loading: () => <div className="p-12 text-center text-gray-500">Loading book view...</div>,
+});
 
 type TabType = 'request' | 'plan' | 'draft' | 'assets' | 'preview';
 
@@ -25,6 +31,7 @@ export default function ProjectPage() {
   const [pipeline, setPipeline] = useState<PipelineState>({ step: 'idle' });
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [twoColumn, setTwoColumn] = useState(true);
+  const [previewMode, setPreviewMode] = useState<'document' | 'book'>('document');
 
   // Editable fields
   const [editedRequest, setEditedRequest] = useState('');
@@ -80,15 +87,27 @@ export default function ProjectPage() {
       return;
     }
 
+    if (!project) return;
+
     setPipeline({ step: 'planning', progress: 'Generating document plan...' });
     setActiveTab('plan');
 
     try {
+      // Merge shared context from settings with project-specific context
+      const planContext = {
+        partyLevel: project.context?.partyLevel || settings.sharedContext?.defaultPartyLevel,
+        partySize: project.context?.partySize || settings.sharedContext?.defaultPartySize,
+        worldDescription: settings.sharedContext?.worldDescription,
+        campaignNotes: project.context?.campaignNotes,
+        customInstructions: settings.sharedContext?.customInstructions,
+      };
+
       const plan = await generatePlan(
         settings.openRouterApiKey,
         settings.defaultModelId,
         project!.userRequest,
-        project!.docType
+        project!.docType,
+        planContext
       );
       await saveProjectData({ docPlan: plan });
       setPipeline({ step: 'idle' });
@@ -176,10 +195,24 @@ export default function ProjectPage() {
     }
   };
 
-  // PIPELINE: Approve Pro Map
-  const handleApproveProMap = async (assetId: string) => {
+  // Map workflow state
+  const [feedbackModal, setFeedbackModal] = useState<{ assetId: string; isOpen: boolean }>({ assetId: '', isOpen: false });
+  const [feedbackText, setFeedbackText] = useState('');
+
+  // MAP WORKFLOW: Approve (use preview as final)
+  const handleApproveMap = async (assetId: string) => {
     const asset = project?.assets.find(a => a.id === assetId);
     if (!asset || asset.mapStatus !== 'preview') return;
+
+    const approvedAsset = approveMap(asset);
+    const updatedAssets = project!.assets.map(a => a.id === assetId ? approvedAsset : a);
+    await saveProjectData({ assets: updatedAssets });
+  };
+
+  // MAP WORKFLOW: Finalize (upgrade to Pro)
+  const handleFinalizeMap = async (assetId: string) => {
+    const asset = project?.assets.find(a => a.id === assetId);
+    if (!asset || !asset.previewUrl) return;
 
     const settings = getSettings();
     if (!settings.falApiKey) {
@@ -187,34 +220,45 @@ export default function ProjectPage() {
       return;
     }
 
-    setPipeline({ step: 'generating-assets', progress: `Generating Pro map for ${assetId}...` });
+    setPipeline({ step: 'generating-assets', progress: `Finalizing ${asset.purpose} with Pro...` });
 
     try {
-      const result = await editImageBananaPro(settings.falApiKey, {
-        prompt: asset.prompt,
-        image_urls: [asset.previewUrl!],
-        resolution: '2K',
-      });
-
-      const updatedAsset: Asset = {
-        ...asset,
-        urls: [result.images[0]?.url || asset.urls[0]],
-        width: result.images[0]?.width,
-        height: result.images[0]?.height,
-        model: 'fal-ai/nano-banana-pro/edit',
-        mapStatus: 'pro-generated',
-      };
-
-      const updatedAssets = project!.assets.map(a =>
-        a.id === assetId ? updatedAsset : a
-      );
-
+      const finalizedAsset = await finalizeMapWithPro(settings.falApiKey, asset);
+      const updatedAssets = project!.assets.map(a => a.id === assetId ? finalizedAsset : a);
       await saveProjectData({ assets: updatedAssets });
       setPipeline({ step: 'idle' });
     } catch (err) {
       setPipeline({
         step: 'idle',
-        error: err instanceof Error ? err.message : 'Failed to generate Pro map',
+        error: err instanceof Error ? err.message : 'Failed to finalize map',
+      });
+    }
+  };
+
+  // MAP WORKFLOW: Submit Feedback (revise with Nano Banana)
+  const handleSubmitFeedback = async () => {
+    const asset = project?.assets.find(a => a.id === feedbackModal.assetId);
+    if (!asset || !feedbackText.trim()) return;
+
+    const settings = getSettings();
+    if (!settings.falApiKey) {
+      alert('Please set your fal.ai API key in Settings.');
+      return;
+    }
+
+    setPipeline({ step: 'generating-assets', progress: `Revising ${asset.purpose}...` });
+    setFeedbackModal({ assetId: '', isOpen: false });
+
+    try {
+      const revisedAsset = await reviseMapWithFeedback(settings.falApiKey, asset, feedbackText);
+      const updatedAssets = project!.assets.map(a => a.id === feedbackModal.assetId ? revisedAsset : a);
+      await saveProjectData({ assets: updatedAssets });
+      setFeedbackText('');
+      setPipeline({ step: 'idle' });
+    } catch (err) {
+      setPipeline({
+        step: 'idle',
+        error: err instanceof Error ? err.message : 'Failed to revise map',
       });
     }
   };
@@ -387,11 +431,10 @@ export default function ProjectPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
-                activeTab === tab
-                  ? 'border-red-800 text-red-800'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition ${activeTab === tab
+                ? 'border-red-800 text-red-800'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
               {tab === 'assets' && pendingMapApprovals.length > 0 && (
@@ -409,35 +452,110 @@ export default function ProjectPage() {
         <div className="max-w-7xl mx-auto">
           {/* Request Tab */}
           {activeTab === 'request' && (
-            <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Request
-                </label>
-                <textarea
-                  value={editedRequest}
-                  onChange={(e) => setEditedRequest(e.target.value)}
-                  rows={6}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
+            <div className="space-y-6">
+              {/* Main Request */}
+              <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Your Request
+                  </label>
+                  <textarea
+                    value={editedRequest}
+                    onChange={(e) => setEditedRequest(e.target.value)}
+                    rows={6}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Document Type (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editedDocType}
+                    onChange={(e) => setEditedDocType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <button
+                  onClick={handleSaveRequest}
+                  className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition"
+                >
+                  Save Changes
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Document Type (optional)
-                </label>
-                <input
-                  type="text"
-                  value={editedDocType}
-                  onChange={(e) => setEditedDocType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
+
+              {/* Campaign Context */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaign Context</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Override global defaults or add project-specific context.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Party Level
+                      </label>
+                      <select
+                        value={project.context?.partyLevel || ''}
+                        onChange={(e) => saveProjectData({
+                          context: {
+                            ...project.context,
+                            partyLevel: e.target.value ? parseInt(e.target.value) : undefined,
+                          }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        <option value="">Use default</option>
+                        {Array.from({ length: 20 }, (_, i) => i + 1).map(level => (
+                          <option key={level} value={level}>Level {level}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Party Size
+                      </label>
+                      <select
+                        value={project.context?.partySize || ''}
+                        onChange={(e) => saveProjectData({
+                          context: {
+                            ...project.context,
+                            partySize: e.target.value ? parseInt(e.target.value) : undefined,
+                          }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        <option value="">Use default</option>
+                        {Array.from({ length: 8 }, (_, i) => i + 1).map(size => (
+                          <option key={size} value={size}>{size} players</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Campaign Notes (optional)
+                    </label>
+                    <textarea
+                      value={project.context?.campaignNotes || ''}
+                      onChange={(e) => saveProjectData({
+                        context: {
+                          ...project.context,
+                          campaignNotes: e.target.value,
+                        }
+                      })}
+                      rows={4}
+                      placeholder="Add any specific context for this project... e.g., this is set in a desert, the party just defeated the local bandit lord..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={handleSaveRequest}
-                className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition"
-              >
-                Save Changes
-              </button>
             </div>
           )}
 
@@ -597,14 +715,19 @@ export default function ProjectPage() {
             <div className="space-y-6">
               {pendingMapApprovals.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <h3 className="font-bold text-amber-900 mb-2">Maps Awaiting Approval</h3>
+                  <h3 className="font-bold text-amber-900 mb-2">Maps Awaiting Review</h3>
                   <p className="text-sm text-amber-800 mb-4">
-                    These maps have preview versions. Click &quot;Approve Pro Map&quot; to generate high-quality versions using the Pro model.
+                    Review each map preview. <strong>Approve</strong> to use as-is, <strong>Finalize</strong> to upgrade with Pro model, or provide <strong>Feedback</strong> to revise.
                   </p>
                   <div className="grid gap-4 md:grid-cols-2">
                     {pendingMapApprovals.map(asset => (
                       <div key={asset.id} className="bg-white rounded-lg p-4 shadow-sm">
                         <div className="font-medium mb-2">{asset.purpose}</div>
+                        {asset.mapFeedback && (
+                          <div className="text-xs text-blue-600 mb-2 italic">
+                            Previous feedback: {asset.mapFeedback}
+                          </div>
+                        )}
                         {asset.previewUrl && (
                           <img
                             src={asset.previewUrl}
@@ -612,13 +735,29 @@ export default function ProjectPage() {
                             className="w-full rounded mb-3"
                           />
                         )}
-                        <button
-                          onClick={() => handleApproveProMap(asset.id)}
-                          disabled={pipeline.step !== 'idle'}
-                          className="w-full px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
-                        >
-                          Approve Pro Map
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApproveMap(asset.id)}
+                            disabled={pipeline.step !== 'idle'}
+                            className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
+                          >
+                            ✓ Approve
+                          </button>
+                          <button
+                            onClick={() => handleFinalizeMap(asset.id)}
+                            disabled={pipeline.step !== 'idle'}
+                            className="flex-1 px-3 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
+                          >
+                            ★ Finalize Pro
+                          </button>
+                          <button
+                            onClick={() => setFeedbackModal({ assetId: asset.id, isOpen: true })}
+                            disabled={pipeline.step !== 'idle'}
+                            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
+                          >
+                            ✎ Feedback
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -630,24 +769,25 @@ export default function ProjectPage() {
                   {project.assets.map(asset => (
                     <div key={asset.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       {asset.urls[0] && (
-                        <img
-                          src={asset.urls[0]}
-                          alt={asset.purpose}
-                          className="w-full h-48 object-cover"
-                        />
+                        <div className="bg-gray-100 p-2">
+                          <img
+                            src={asset.urls[0]}
+                            alt={asset.purpose}
+                            className="w-full h-auto max-h-64 object-contain mx-auto"
+                          />
+                        </div>
                       )}
                       <div className="p-4">
                         <div className="font-medium text-gray-900">{asset.purpose}</div>
                         <div className="text-sm text-gray-500 mt-1">
                           {asset.isMap && (
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs mr-2 ${
-                              asset.mapStatus === 'pro-generated'
-                                ? 'bg-green-100 text-green-800'
-                                : asset.mapStatus === 'approved'
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs mr-2 ${asset.mapStatus === 'finalized'
+                              ? 'bg-green-100 text-green-800'
+                              : asset.mapStatus === 'approved'
                                 ? 'bg-blue-100 text-blue-800'
                                 : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {asset.mapStatus === 'pro-generated' ? 'Pro' : asset.mapStatus === 'approved' ? 'Approved' : 'Preview'}
+                              }`}>
+                              {asset.mapStatus === 'finalized' ? 'Pro' : asset.mapStatus === 'approved' ? 'Approved' : 'Preview'}
                             </span>
                           )}
                           {asset.model}
@@ -668,23 +808,91 @@ export default function ProjectPage() {
 
           {/* Preview Tab */}
           {activeTab === 'preview' && (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              {previewHtml ? (
-                <iframe
-                  srcDoc={previewHtml}
-                  className="w-full h-[800px] border-0"
-                  title="Document Preview"
-                />
-              ) : (
-                <div className="p-12 text-center text-gray-500">
-                  <p>No preview built yet.</p>
-                  <p className="text-sm mt-2">Click &quot;Build Preview&quot; to render the document.</p>
+            <div className="space-y-4">
+              {/* Preview Mode Toggle */}
+              <div className="flex items-center justify-center gap-4 bg-white rounded-lg shadow-md p-4">
+                <span className="text-sm font-medium text-gray-600">View Mode:</span>
+                <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                  <button
+                    onClick={() => setPreviewMode('document')}
+                    className={`px-4 py-2 text-sm font-medium transition ${previewMode === 'document'
+                      ? 'bg-red-900 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                      }`}
+                  >
+                    📄 Document
+                  </button>
+                  <button
+                    onClick={() => setPreviewMode('book')}
+                    className={`px-4 py-2 text-sm font-medium transition ${previewMode === 'book'
+                      ? 'bg-red-900 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                      }`}
+                  >
+                    📖 Book View
+                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* Preview Content */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                {previewHtml ? (
+                  previewMode === 'document' ? (
+                    <iframe
+                      srcDoc={previewHtml}
+                      className="w-full h-[800px] border-0"
+                      title="Document Preview"
+                    />
+                  ) : (
+                    <PageFlipper htmlContent={previewHtml} />
+                  )
+                ) : (
+                  <div className="p-12 text-center text-gray-500">
+                    <p>No preview built yet.</p>
+                    <p className="text-sm mt-2">Click &quot;Build Preview&quot; to render the document.</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       </main>
+
+      {/* Feedback Modal */}
+      {feedbackModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Provide Feedback for Map</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Describe what changes you&apos;d like to see. The map will be regenerated with your feedback.
+            </p>
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="e.g., Make the forest area larger, add a river on the east side, remove the mountain..."
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={handleSubmitFeedback}
+                disabled={!feedbackText.trim() || pipeline.step !== 'idle'}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+              >
+                Submit & Revise
+              </button>
+              <button
+                onClick={() => {
+                  setFeedbackModal({ assetId: '', isOpen: false });
+                  setFeedbackText('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,6 +25,12 @@ const PageFlipper = dynamic(() => import('@/components/PageFlipper'), {
   loading: () => <div className="p-12 text-center text-gray-500">Loading book view...</div>,
 });
 
+// Dynamic import for EntityEditor
+const EntityEditor = dynamic(() => import('@/components/EntityEditor'), {
+  ssr: false,
+  loading: () => <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading entity manager...</div>,
+});
+
 type TabType = 'request' | 'plan' | 'draft' | 'assets' | 'preview';
 
 export default function ProjectPage() {
@@ -587,7 +593,7 @@ export default function ProjectPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-red-800 border-t-transparent rounded-full"></div>
       </div>
     );
@@ -626,7 +632,7 @@ export default function ProjectPage() {
 
       {/* Pipeline Status */}
       {(pipeline.step !== 'idle' || pipeline.error) && (
-        <div className={`px-6 py-3 ${pipeline.error ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+        <div className={`px-6 py-3 ${pipeline.error ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200' : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200'}`}>
           <div className="max-w-7xl mx-auto flex items-center gap-3">
             {pipeline.step !== 'idle' && (
               <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
@@ -677,7 +683,7 @@ export default function ProjectPage() {
 
           <div className="flex-1"></div>
 
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
               type="checkbox"
               checked={twoColumn}
@@ -719,48 +725,48 @@ export default function ProjectPage() {
           {activeTab === 'request' && (
             <div className="space-y-6">
               {/* Main Request */}
-              <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Your Request
                   </label>
                   <textarea
                     value={editedRequest}
                     onChange={(e) => setEditedRequest(e.target.value)}
                     rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Document Type (optional)
                   </label>
                   <input
                     type="text"
                     value={editedDocType}
                     onChange={(e) => setEditedDocType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <button
                   onClick={handleSaveRequest}
-                  className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 transition"
+                  className="px-4 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition"
                 >
                   Save Changes
                 </button>
               </div>
 
               {/* Campaign Context */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaign Context</h3>
-                <p className="text-sm text-gray-600 mb-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Campaign Context</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   Override global defaults or add project-specific context.
                 </p>
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Party Level
                       </label>
                       <select
@@ -771,7 +777,7 @@ export default function ProjectPage() {
                             partyLevel: e.target.value ? parseInt(e.target.value) : undefined,
                           }
                         })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                       >
                         <option value="">Use default</option>
                         {Array.from({ length: 20 }, (_, i) => i + 1).map(level => (
@@ -781,7 +787,7 @@ export default function ProjectPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Party Size
                       </label>
                       <select
@@ -792,7 +798,7 @@ export default function ProjectPage() {
                             partySize: e.target.value ? parseInt(e.target.value) : undefined,
                           }
                         })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                       >
                         <option value="">Use default</option>
                         {Array.from({ length: 8 }, (_, i) => i + 1).map(size => (
@@ -803,7 +809,7 @@ export default function ProjectPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Campaign Notes (optional)
                     </label>
                     <textarea
@@ -816,7 +822,7 @@ export default function ProjectPage() {
                       })}
                       rows={4}
                       placeholder="Add any specific context for this project... e.g., this is set in a desert, the party just defeated the local bandit lord..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                     />
                   </div>
                 </div>
@@ -826,26 +832,26 @@ export default function ProjectPage() {
 
           {/* Plan Tab */}
           {activeTab === 'plan' && (
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               {project.docPlan ? (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-2xl font-serif font-bold text-red-900">{project.docPlan.title}</h2>
+                    <h2 className="text-2xl font-serif font-bold text-red-900 dark:text-red-400">{project.docPlan.title}</h2>
                     {project.docPlan.subtitle && (
-                      <p className="text-lg text-gray-600 italic">{project.docPlan.subtitle}</p>
+                      <p className="text-lg text-gray-600 dark:text-gray-400 italic">{project.docPlan.subtitle}</p>
                     )}
-                    <p className="text-sm text-gray-500 mt-1">Tone: {project.docPlan.tone}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Tone: {project.docPlan.tone}</p>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-3">Sections</h3>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-3">Sections</h3>
                     <div className="space-y-2">
                       {project.docPlan.sections.map(section => (
                         <div key={section.id} className="border-l-4 border-amber-500 pl-3 py-1">
-                          <div className="font-medium">{section.heading}</div>
-                          <div className="text-sm text-gray-500">~{section.wordCount} words</div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">{section.heading}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">~{section.wordCount} words</div>
                           {section.subsections && section.subsections.length > 0 && (
-                            <ul className="ml-4 mt-1 text-sm text-gray-600">
+                            <ul className="ml-4 mt-1 text-sm text-gray-600 dark:text-gray-400">
                               {section.subsections.map(sub => (
                                 <li key={sub.id}>{sub.heading} (~{sub.wordCount} words)</li>
                               ))}
@@ -858,15 +864,15 @@ export default function ProjectPage() {
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-3">Entity Registry</h3>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-3">Entity Registry</h3>
                       <div className="space-y-4 text-sm">
                         {project.docPlan.entityRegistry.npcs.length > 0 && (
                           <div>
-                            <h4 className="font-medium text-gray-700">NPCs</h4>
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">NPCs</h4>
                             <ul className="ml-2">
                               {project.docPlan.entityRegistry.npcs.map(e => (
-                                <li key={e.id} className="text-gray-600">
-                                  <span className="font-medium">{e.name}</span>: {e.summary}
+                                <li key={e.id} className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium text-gray-800 dark:text-gray-200">{e.name}</span>: {e.summary}
                                 </li>
                               ))}
                             </ul>
@@ -874,11 +880,11 @@ export default function ProjectPage() {
                         )}
                         {project.docPlan.entityRegistry.locations.length > 0 && (
                           <div>
-                            <h4 className="font-medium text-gray-700">Locations</h4>
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Locations</h4>
                             <ul className="ml-2">
                               {project.docPlan.entityRegistry.locations.map(e => (
-                                <li key={e.id} className="text-gray-600">
-                                  <span className="font-medium">{e.name}</span>: {e.summary}
+                                <li key={e.id} className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium text-gray-800 dark:text-gray-200">{e.name}</span>: {e.summary}
                                 </li>
                               ))}
                             </ul>
@@ -886,11 +892,11 @@ export default function ProjectPage() {
                         )}
                         {project.docPlan.entityRegistry.monsters.length > 0 && (
                           <div>
-                            <h4 className="font-medium text-gray-700">Monsters</h4>
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Monsters</h4>
                             <ul className="ml-2">
                               {project.docPlan.entityRegistry.monsters.map(e => (
-                                <li key={e.id} className="text-gray-600">
-                                  <span className="font-medium">{e.name}</span>: {e.summary}
+                                <li key={e.id} className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium text-gray-800 dark:text-gray-200">{e.name}</span>: {e.summary}
                                 </li>
                               ))}
                             </ul>
@@ -898,11 +904,11 @@ export default function ProjectPage() {
                         )}
                         {project.docPlan.entityRegistry.items.length > 0 && (
                           <div>
-                            <h4 className="font-medium text-gray-700">Items</h4>
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Items</h4>
                             <ul className="ml-2">
                               {project.docPlan.entityRegistry.items.map(e => (
-                                <li key={e.id} className="text-gray-600">
-                                  <span className="font-medium">{e.name}</span>{e.rarity && ` [${e.rarity}]`}: {e.summary}
+                                <li key={e.id} className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium text-gray-800 dark:text-gray-200">{e.name}</span>{e.rarity && ` [${e.rarity}]`}: {e.summary}
                                 </li>
                               ))}
                             </ul>
@@ -912,37 +918,50 @@ export default function ProjectPage() {
                     </div>
 
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-3">Asset Plan</h3>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-3">Asset Plan</h3>
                       <div className="space-y-2 text-sm">
                         {project.docPlan.assetPlan.map(asset => (
-                          <div key={asset.id} className="p-2 bg-gray-50 rounded">
-                            <div className="font-medium">{asset.purpose}</div>
-                            <div className="text-gray-500 text-xs">
-                              {asset.isMap && <span className="text-amber-600">[MAP] </span>}
+                          <div key={asset.id} className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                            <div className="font-medium text-gray-900 dark:text-gray-100">{asset.purpose}</div>
+                            <div className="text-gray-500 dark:text-gray-400 text-xs">
+                              {asset.isMap && <span className="text-amber-600 dark:text-amber-400">[MAP] </span>}
                               {asset.aspectRatio && <span>{asset.aspectRatio}</span>}
                             </div>
-                            <div className="text-gray-600 mt-1 text-xs">{asset.promptSeed}</div>
+                            <div className="text-gray-600 dark:text-gray-400 mt-1 text-xs">{asset.promptSeed}</div>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t">
+                  <div className="pt-4 border-t dark:border-gray-700">
                     <details>
-                      <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
+                      <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
                         View Raw JSON
                       </summary>
-                      <pre className="mt-2 p-4 bg-gray-100 rounded text-xs overflow-auto">
+                      <pre className="mt-2 p-4 bg-gray-100 dark:bg-gray-900 rounded text-xs overflow-auto text-gray-800 dark:text-gray-200">
                         {JSON.stringify(project.docPlan, null, 2)}
                       </pre>
                     </details>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <p>No plan generated yet.</p>
                   <p className="text-sm mt-2">Click &quot;Generate Plan&quot; to create a document plan.</p>
+                </div>
+              )}
+
+              {/* Entity Manager */}
+              {project.docPlan && (
+                <div className="mt-6">
+                  <EntityEditor
+                    docPlan={project.docPlan}
+                    onUpdate={async (newPlan) => {
+                      await saveProjectData({ docPlan: newPlan });
+                    }}
+                    onRegenerateSection={project.markdown ? handleRegenerateSection : undefined}
+                  />
                 </div>
               )}
             </div>
@@ -1025,7 +1044,7 @@ export default function ProjectPage() {
                   >
                     Download All ({project.assets.length})
                   </button>
-                  <span className="text-gray-300">|</span>
+                  <span className="text-gray-300 dark:text-gray-600">|</span>
                   {(['all', 'portraits', 'maps', 'items', 'scenes'] as const).map(filter => (
                     <button
                       key={filter}
@@ -1033,7 +1052,7 @@ export default function ProjectPage() {
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
                         assetFilter === filter
                           ? 'bg-red-800 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                     >
                       {filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -1056,14 +1075,14 @@ export default function ProjectPage() {
               )}
 
               {pendingMapApprovals.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <h3 className="font-bold text-amber-900 mb-2">Maps Awaiting Review</h3>
-                  <p className="text-sm text-amber-800 mb-4">
+                <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <h3 className="font-bold text-amber-900 dark:text-amber-200 mb-2">Maps Awaiting Review</h3>
+                  <p className="text-sm text-amber-800 dark:text-amber-300 mb-4">
                     Review each map preview. <strong>Approve</strong> to use as-is, <strong>Finalize</strong> to upgrade with Pro model, or provide <strong>Feedback</strong> to revise.
                   </p>
                   <div className="grid gap-4 md:grid-cols-2">
                     {pendingMapApprovals.map(asset => (
-                      <div key={asset.id} className="bg-white rounded-lg p-4 shadow-sm">
+                      <div key={asset.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
                         <div className="font-medium mb-2">{asset.purpose}</div>
                         {asset.mapFeedback && (
                           <div className="text-xs text-blue-600 mb-2 italic">
@@ -1110,10 +1129,10 @@ export default function ProjectPage() {
               {project.assets.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {getFilteredAssets().map(asset => (
-                    <div key={asset.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div key={asset.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                       {asset.urls[0] && (
                         <div
-                          className="bg-gray-100 p-2 cursor-pointer hover:bg-gray-200 transition"
+                          className="bg-gray-100 dark:bg-gray-700 p-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition"
                           onClick={() => setLightbox({ isOpen: true, imageUrl: asset.urls[0], assetPurpose: asset.purpose })}
                         >
                           <img
@@ -1126,8 +1145,8 @@ export default function ProjectPage() {
 
                       {/* Variations Preview */}
                       {asset.allVariations && asset.allVariations.length > 1 && (
-                        <div className="px-2 py-2 bg-gray-50 border-t">
-                          <div className="text-xs text-gray-500 mb-1">Variations ({asset.allVariations.length}):</div>
+                        <div className="px-2 py-2 bg-gray-50 dark:bg-gray-700 border-t dark:border-gray-600">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Variations ({asset.allVariations.length}):</div>
                           <div className="flex gap-1 overflow-x-auto">
                             {asset.allVariations.map((url, idx) => (
                               <button
@@ -1147,8 +1166,8 @@ export default function ProjectPage() {
                       )}
 
                       <div className="p-4">
-                        <div className="font-medium text-gray-900">{asset.purpose}</div>
-                        <div className="text-sm text-gray-500 mt-1">
+                        <div className="font-medium text-gray-900 dark:text-gray-100">{asset.purpose}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           {asset.isMap && (
                             <span className={`inline-block px-2 py-0.5 rounded text-xs mr-2 ${asset.mapStatus === 'finalized'
                               ? 'bg-green-100 text-green-800'
@@ -1161,14 +1180,14 @@ export default function ProjectPage() {
                           )}
                           {asset.model}
                         </div>
-                        <div className="text-xs text-gray-400 mt-2 line-clamp-2">{asset.prompt}</div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500 mt-2 line-clamp-2">{asset.prompt}</div>
 
                         {/* Action Buttons */}
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                           <button
                             onClick={() => handleQuickRegenerate(asset.id)}
                             disabled={pipeline.step !== 'idle'}
-                            className="flex-1 px-2 py-1.5 bg-gray-100 text-gray-700 rounded text-xs font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            className="flex-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
                             title="Regenerate with same prompt"
                           >
                             Regenerate
@@ -1176,7 +1195,7 @@ export default function ProjectPage() {
                           <button
                             onClick={() => openAssetEditModal(asset.id, 'edit')}
                             disabled={pipeline.step !== 'idle'}
-                            className="flex-1 px-2 py-1.5 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            className="flex-1 px-2 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-xs font-medium hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                             title="Edit prompt and regenerate"
                           >
                             Edit
@@ -1184,7 +1203,7 @@ export default function ProjectPage() {
                           <button
                             onClick={() => openAssetEditModal(asset.id, 'variations')}
                             disabled={pipeline.step !== 'idle'}
-                            className="flex-1 px-2 py-1.5 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            className="flex-1 px-2 py-1.5 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded text-xs font-medium hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                             title="Generate multiple variations"
                           >
                             Variations
@@ -1192,7 +1211,7 @@ export default function ProjectPage() {
                           <a
                             href={asset.urls[0]}
                             download={`${asset.purpose.replace(/\s+/g, '_')}.png`}
-                            className="px-2 py-1.5 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition"
+                            className="px-2 py-1.5 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded text-xs font-medium hover:bg-green-200 dark:hover:bg-green-800 transition"
                             title="Download image"
                           >
                             Download
@@ -1202,7 +1221,7 @@ export default function ProjectPage() {
                         {/* Version History */}
                         {asset.previousVersions && asset.previousVersions.length > 0 && (
                           <details className="mt-2">
-                            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
+                            <summary className="text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-400">
                               History ({asset.previousVersions.length} previous)
                             </summary>
                             <div className="mt-1 flex gap-1 overflow-x-auto py-1">
@@ -1224,7 +1243,7 @@ export default function ProjectPage() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-lg shadow-md p-12 text-center text-gray-500">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center text-gray-500 dark:text-gray-400">
                   <p>No assets generated yet.</p>
                   <p className="text-sm mt-2">Click &quot;Generate Assets&quot; to create images.</p>
                 </div>
@@ -1236,14 +1255,14 @@ export default function ProjectPage() {
           {activeTab === 'preview' && (
             <div className="space-y-4">
               {/* Preview Mode Toggle */}
-              <div className="flex items-center justify-center gap-4 bg-white rounded-lg shadow-md p-4">
-                <span className="text-sm font-medium text-gray-600">View Mode:</span>
-                <div className="flex rounded-lg overflow-hidden border border-gray-300">
+              <div className="flex items-center justify-center gap-4 bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">View Mode:</span>
+                <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
                   <button
                     onClick={() => setPreviewMode('document')}
                     className={`px-4 py-2 text-sm font-medium transition ${previewMode === 'document'
                       ? 'bg-red-900 text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
                       }`}
                   >
                     📄 Document
@@ -1252,7 +1271,7 @@ export default function ProjectPage() {
                     onClick={() => setPreviewMode('book')}
                     className={`px-4 py-2 text-sm font-medium transition ${previewMode === 'book'
                       ? 'bg-red-900 text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
                       }`}
                   >
                     📖 Book View
@@ -1261,7 +1280,7 @@ export default function ProjectPage() {
               </div>
 
               {/* Preview Content */}
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                 {previewHtml ? (
                   previewMode === 'document' ? (
                     <iframe
@@ -1273,7 +1292,7 @@ export default function ProjectPage() {
                     <PageFlipper htmlContent={previewHtml} />
                   )
                 ) : (
-                  <div className="p-12 text-center text-gray-500">
+                  <div className="p-12 text-center text-gray-500 dark:text-gray-400">
                     <p>No preview built yet.</p>
                     <p className="text-sm mt-2">Click &quot;Build Preview&quot; to render the document.</p>
                   </div>
@@ -1287,16 +1306,16 @@ export default function ProjectPage() {
       {/* Feedback Modal */}
       {feedbackModal.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Provide Feedback for Map</h3>
-            <p className="text-sm text-gray-600 mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Provide Feedback for Map</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Describe what changes you&apos;d like to see. The map will be regenerated with your feedback.
             </p>
             <textarea
               value={feedbackText}
               onChange={(e) => setFeedbackText(e.target.value)}
               placeholder="e.g., Make the forest area larger, add a river on the east side, remove the mountain..."
-              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full h-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
             />
             <div className="flex gap-3 mt-4">
               <button
@@ -1311,7 +1330,7 @@ export default function ProjectPage() {
                   setFeedbackModal({ assetId: '', isOpen: false });
                   setFeedbackText('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
               >
                 Cancel
               </button>
@@ -1323,32 +1342,32 @@ export default function ProjectPage() {
       {/* Asset Edit Modal */}
       {assetEditModal.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
               {assetEditModal.mode === 'variations' ? 'Generate Variations' : 'Edit & Regenerate'}
             </h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Image Prompt
                 </label>
                 <textarea
                   value={editPrompt}
                   onChange={(e) => setEditPrompt(e.target.value)}
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Aspect Ratio
                 </label>
                 <select
                   value={editAspectRatio}
                   onChange={(e) => setEditAspectRatio(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 >
                   <option value="">Default</option>
                   <option value="1:1">Square (1:1)</option>
@@ -1362,7 +1381,7 @@ export default function ProjectPage() {
 
               {assetEditModal.mode === 'variations' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Number of Variations
                   </label>
                   <div className="flex gap-2">
@@ -1373,7 +1392,7 @@ export default function ProjectPage() {
                         className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
                           numVariations === num
                             ? 'bg-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                       >
                         {num} images
@@ -1398,7 +1417,7 @@ export default function ProjectPage() {
                   setEditPrompt('');
                   setEditAspectRatio('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
               >
                 Cancel
               </button>
@@ -1484,37 +1503,37 @@ export default function ProjectPage() {
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowShortcuts(false)}
         >
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Keyboard Shortcuts</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Keyboard Shortcuts</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Navigate tabs</span>
-                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">1-5</kbd>
+                <span className="text-gray-600 dark:text-gray-400">Navigate tabs</span>
+                <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-mono">1-5</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Generate next step</span>
-                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Cmd/Ctrl + G</kbd>
+                <span className="text-gray-600 dark:text-gray-400">Generate next step</span>
+                <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-mono">Cmd/Ctrl + G</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Build preview</span>
-                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Cmd/Ctrl + B</kbd>
+                <span className="text-gray-600 dark:text-gray-400">Build preview</span>
+                <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-mono">Cmd/Ctrl + B</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Export PDF</span>
-                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Cmd/Ctrl + E</kbd>
+                <span className="text-gray-600 dark:text-gray-400">Export PDF</span>
+                <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-mono">Cmd/Ctrl + E</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Close modal</span>
-                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">Esc</kbd>
+                <span className="text-gray-600 dark:text-gray-400">Close modal</span>
+                <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-mono">Esc</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Show this help</span>
-                <kbd className="px-2 py-1 bg-gray-100 rounded font-mono">?</kbd>
+                <span className="text-gray-600 dark:text-gray-400">Show this help</span>
+                <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-mono">?</kbd>
               </div>
             </div>
             <button
               onClick={() => setShowShortcuts(false)}
-              className="mt-6 w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+              className="mt-6 w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
             >
               Close
             </button>
@@ -1525,9 +1544,9 @@ export default function ProjectPage() {
       {/* Export Format Modal */}
       {exportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Export PDF</h3>
-            <p className="text-sm text-gray-600 mb-4">Choose a page format for your PDF:</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Export PDF</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Choose a page format for your PDF:</p>
 
             <div className="space-y-2">
               {([
@@ -1541,12 +1560,12 @@ export default function ProjectPage() {
                   onClick={() => setExportFormat(format.value)}
                   className={`w-full text-left px-4 py-3 rounded-lg border-2 transition ${
                     exportFormat === format.value
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-red-500 bg-red-50 dark:bg-red-900/30'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                   }`}
                 >
-                  <div className="font-medium">{format.label}</div>
-                  <div className="text-xs text-gray-500">{format.desc}</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{format.label}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{format.desc}</div>
                 </button>
               ))}
             </div>
@@ -1560,7 +1579,7 @@ export default function ProjectPage() {
               </button>
               <button
                 onClick={() => setExportModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition font-medium"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
               >
                 Cancel
               </button>

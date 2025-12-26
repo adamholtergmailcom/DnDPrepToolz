@@ -41,13 +41,19 @@ export async function chatCompletion(
   modelId: string,
   messages: ChatMessage[],
   tools?: ToolDefinition[],
-  temperature: number = 0.7
+  temperature: number = 0.7,
+  maxTokens?: number
 ): Promise<ChatCompletionResponse> {
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
     temperature,
   };
+
+  // Use high max_tokens for content generation - most models support at least 16K output
+  if (maxTokens) {
+    body.max_tokens = maxTokens;
+  }
 
   if (tools && tools.length > 0) {
     body.tools = tools;

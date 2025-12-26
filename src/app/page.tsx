@@ -127,13 +127,13 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleExport}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition"
+              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 transition"
             >
               Export All
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition"
+              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 transition"
             >
               Import
             </button>
@@ -210,20 +210,20 @@ export default function HomePage() {
                   <div className="flex items-center gap-2 ml-4">
                     <Link
                       href={`/project/${project.id}`}
-                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md transition text-sm"
+                      className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition text-sm dark:text-gray-200"
                     >
                       Open
                     </Link>
                     <button
                       onClick={() => handleDuplicate(project.id)}
-                      className="px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-md transition text-sm"
+                      className="px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition text-sm"
                       title="Duplicate project"
                     >
                       Duplicate
                     </button>
                     <button
                       onClick={() => handleDelete(project.id)}
-                      className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition text-sm"
+                      className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900 rounded-md transition text-sm"
                     >
                       Delete
                     </button>
@@ -238,12 +238,12 @@ export default function HomePage() {
       {/* New Project Modal */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h2 className="text-xl font-serif font-bold text-gray-900 mb-4">New Project</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h2 className="text-xl font-serif font-bold text-gray-900 dark:text-gray-100 mb-4">New Project</h2>
 
             <div className="space-y-4">
               <div>
-                <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Project Name
                 </label>
                 <input
@@ -252,12 +252,12 @@ export default function HomePage() {
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                   placeholder="e.g., The Haunted Village"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
 
               <div>
-                <label htmlFor="user-request" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="user-request" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   What do you want to create?
                 </label>
                 <textarea
@@ -266,12 +266,12 @@ export default function HomePage() {
                   onChange={(e) => setNewUserRequest(e.target.value)}
                   placeholder="Describe your D&D content request in detail. For example: 'A spooky one-shot adventure set in an abandoned fishing village where the townsfolk have been replaced by shapeshifting creatures from the Shadowfell.'"
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
 
               <div>
-                <label htmlFor="doc-type" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="doc-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Document Type (optional)
                 </label>
                 <input
@@ -280,7 +280,7 @@ export default function HomePage() {
                   value={newDocType}
                   onChange={(e) => setNewDocType(e.target.value)}
                   placeholder="e.g., One-Shot, Town Guide, Monster Manual, etc."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
             </div>
@@ -293,7 +293,7 @@ export default function HomePage() {
                   setNewUserRequest('');
                   setNewDocType('');
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 transition"
               >
                 Cancel
               </button>

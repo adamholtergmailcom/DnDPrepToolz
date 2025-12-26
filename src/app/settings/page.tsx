@@ -48,7 +48,7 @@ export default function SettingsPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 space-y-6">
           {/* OpenRouter API Key */}
           <div>
-            <label htmlFor="openrouter-key" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="openrouter-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               OpenRouter API Key
             </label>
             <input
@@ -57,9 +57,9 @@ export default function SettingsPage() {
               value={settings.openRouterApiKey}
               onChange={(e) => setSettings({ ...settings, openRouterApiKey: e.target.value })}
               placeholder="sk-or-..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Get your API key from{' '}
               <a
                 href="https://openrouter.ai/keys"
@@ -74,7 +74,7 @@ export default function SettingsPage() {
 
           {/* fal.ai API Key */}
           <div>
-            <label htmlFor="fal-key" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="fal-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               fal.ai API Key
             </label>
             <input
@@ -83,9 +83,9 @@ export default function SettingsPage() {
               value={settings.falApiKey}
               onChange={(e) => setSettings({ ...settings, falApiKey: e.target.value })}
               placeholder="fal-..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Get your API key from{' '}
               <a
                 href="https://fal.ai/dashboard/keys"
@@ -128,16 +128,16 @@ export default function SettingsPage() {
           </div>
 
           {/* Shared Context / Campaign Defaults */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaign Defaults</h3>
-            <p className="text-sm text-gray-600 mb-4">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Campaign Defaults</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               This context is automatically included in all generations across all projects.
             </p>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="party-level" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="party-level" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Default Party Level
                   </label>
                   <select
@@ -153,7 +153,7 @@ export default function SettingsPage() {
                         customInstructions: settings.sharedContext?.customInstructions || '',
                       }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   >
                     {Array.from({ length: 20 }, (_, i) => i + 1).map(level => (
                       <option key={level} value={level}>Level {level}</option>
@@ -162,7 +162,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="party-size" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="party-size" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Default Party Size
                   </label>
                   <select
@@ -178,7 +178,7 @@ export default function SettingsPage() {
                         customInstructions: settings.sharedContext?.customInstructions || '',
                       }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   >
                     {Array.from({ length: 8 }, (_, i) => i + 1).map(size => (
                       <option key={size} value={size}>{size} players</option>
@@ -188,7 +188,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label htmlFor="world-description" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="world-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   World/Setting Description
                 </label>
                 <textarea
@@ -205,12 +205,12 @@ export default function SettingsPage() {
                     }
                   })}
                   placeholder="e.g., Forgotten Realms, high magic setting. Sword Coast region. Year 1492 DR..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 h-24 resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 h-24 resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
 
               <div>
-                <label htmlFor="custom-instructions" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="custom-instructions" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Custom Generation Instructions
                 </label>
                 <textarea
@@ -227,14 +227,14 @@ export default function SettingsPage() {
                     }
                   })}
                   placeholder="e.g., Always include RP opportunities. Favor non-combat solutions. Include loot tables..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 h-24 resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 h-24 resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
             </div>
           </div>
 
           {/* Save Button */}
-          <div className="flex items-center gap-4 border-t border-gray-200 pt-6">
+          <div className="flex items-center gap-4 border-t border-gray-200 dark:border-gray-700 pt-6">
             <button
               onClick={handleSave}
               className="px-6 py-2 bg-red-800 text-white rounded-md hover:bg-red-700 transition font-medium"
@@ -242,15 +242,15 @@ export default function SettingsPage() {
               Save Settings
             </button>
             {saved && (
-              <span className="text-green-600 font-medium">Settings saved!</span>
+              <span className="text-green-600 dark:text-green-400 font-medium">Settings saved!</span>
             )}
           </div>
         </div>
 
         {/* Info Section */}
-        <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-6">
-          <h2 className="text-lg font-serif font-bold text-amber-900 mb-3">About API Keys</h2>
-          <ul className="space-y-2 text-sm text-amber-800">
+        <div className="mt-8 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
+          <h2 className="text-lg font-serif font-bold text-amber-900 dark:text-amber-200 mb-3">About API Keys</h2>
+          <ul className="space-y-2 text-sm text-amber-800 dark:text-amber-300">
             <li>
               <strong>OpenRouter:</strong> Used for LLM text generation (planning, drafting). Supports many models including GPT-4, Claude, and Gemini.
             </li>

@@ -3,7 +3,46 @@
 import { DocPlan, ChatMessage, StatBlock } from '../types';
 import { chatCompletion } from '../openrouter';
 
-const DRAFT_SYSTEM_PROMPT = `You are an expert D&D writer creating book-style content. Generate rich, evocative markdown following these conventions:
+const DRAFT_SYSTEM_PROMPT = `You are an expert D&D writer creating COMPREHENSIVE, PRODUCTION-READY content that DMs can use directly at the table. Your content should be detailed enough that a DM never needs to improvise basic information.
+
+## CRITICAL: Detail Requirements
+
+Generate COMPLETE content with these standards:
+
+### For Adventures/One-Shots:
+- Full room/area descriptions with sensory details (sight, sound, smell)
+- Every NPC has personality, motivations, secrets, and sample dialogue
+- Combat encounters include monster tactics, terrain features, and environmental hazards
+- Skill check DCs are specified for all challenges
+- Multiple paths to success - don't railroad players
+- Include "what happens if" contingencies for player choices
+- Treasure is specific with gold values and item descriptions
+
+### For Mysteries:
+- At least 3-5 discoverable clues per major revelation
+- Red herrings that make sense in context
+- Suspects with alibis, motives, and means
+- Investigation mechanics (DC checks, Information rewards)
+- Timeline of events that led to the mystery
+- Multiple possible resolutions
+
+### For NPCs:
+- Physical description (2-3 sentences)
+- Personality traits, ideals, bonds, and flaws
+- Background and how they came to be here
+- Current goals and what they want from the party
+- Secrets they're hiding
+- 2-3 lines of sample dialogue showing their voice
+- Hooks for future adventures
+
+### For Locations:
+- Detailed physical description
+- Notable features and hidden elements
+- Who's here and what they're doing
+- History and purpose
+- Connected hooks and dangers
+
+Generate rich, evocative markdown following these conventions:
 
 ## Formatting Rules
 
@@ -122,21 +161,35 @@ ${docPlan.assetPlan.map(a => `- ID: "${a.id}" → ${a.purpose}${a.isMap ? ' [MAP
 
 ---
 
-Now write the complete document with all sections. Include:
-- Evocative descriptions
-- Practical DM notes in :::note boxes (use **bold** for emphasis)
-- Read-aloud text in :::readaloud boxes
-- Full stat blocks for any monsters using the :::statblock format
-- Magic item descriptions with proper formatting
-- Image placeholders using ![Description](asset:exact_asset_id) syntax - use the EXACT IDs from the asset list above
+Now write the COMPLETE document with ALL sections. This must be production-ready content a DM can run directly.
+
+## REQUIRED Content Standards:
+
+1. **Evocative Descriptions**: Every area gets 2-3 paragraphs of sensory detail
+2. **DM Notes**: Use :::note boxes for tactical advice, DC recommendations, and contingencies
+3. **Read-Aloud Text**: Use :::readaloud boxes for every major location and dramatic moment
+4. **Complete Stat Blocks**: Full 5e stat blocks for ALL monsters using :::statblock format
+5. **NPC Details**: Every named NPC gets personality, motivations, secrets, and sample dialogue
+6. **Skill Challenges**: Specify DCs for all skill checks (Easy 10, Medium 15, Hard 20)
+7. **Combat Tactics**: How do monsters fight? What's their strategy? When do they flee?
+8. **Treasure**: Specific items and gold amounts, not vague "some treasure"
+9. **Consequences**: What happens if players fail? What if they take a different approach?
+10. **Image Placeholders**: Use ![Description](asset:exact_asset_id) syntax with EXACT IDs from above
+
+## Length Expectations:
+- A town guide should be 3,000-6,000 words minimum
+- A one-shot adventure should be 8,000-15,000 words minimum
+- A mystery should include full investigation mechanics and multiple clues
+- A dungeon should have complete room-by-room descriptions
 
 IMPORTANT: When placing monster or NPC images, use the corresponding asset ID from the list above. For maps, place them prominently at the start of relevant sections.
 
-Write the full markdown document now:`,
+Write the COMPLETE, DETAILED markdown document now. DO NOT summarize or abbreviate - write everything out fully:`,
     },
   ];
 
-  const response = await chatCompletion(apiKey, modelId, messages, undefined, 0.8);
+  // Use high max_tokens for comprehensive content generation (16K tokens ≈ 12K words)
+  const response = await chatCompletion(apiKey, modelId, messages, undefined, 0.8, 16000);
   const content = response.choices[0]?.message?.content;
 
   if (!content) {
@@ -374,7 +427,7 @@ export async function regenerateSection(
     throw new Error(`Section "${sectionHeading}" not found`);
   }
 
-  const prompt = `You are regenerating a specific section of a D&D document.
+  const prompt = `You are regenerating a specific section of a D&D document. Your goal is to produce COMPREHENSIVE, PRODUCTION-READY content.
 
 ## Context
 Document Title: ${plan.title}
@@ -389,20 +442,31 @@ ${targetSection.content}
 ${feedback ? `## User Feedback\n${feedback}` : ''}
 
 ## Instructions
-Regenerate ONLY this section's content, improving it based on any feedback provided.
-- Maintain the same formatting conventions (:::readaloud, :::note, :::statblock, etc.)
-- Keep references to other entities consistent
-- Do NOT include the section heading itself, just the content
-- Match the tone and style of the document
+Regenerate this section with SIGNIFICANTLY MORE DETAIL than before. Make it production-ready content a DM can run directly at the table.
 
-Generate the new section content:`;
+REQUIRED:
+- Use :::readaloud boxes for descriptions players should hear
+- Use :::note boxes for DM tips, DCs, and tactical advice
+- Full stat blocks in :::statblock format for any monsters
+- Every NPC gets personality, motivations, and sample dialogue
+- Specify DCs for all skill checks (Easy 10, Medium 15, Hard 20)
+- Include "what happens if" contingencies for player choices
+- Detailed physical descriptions (2-3 paragraphs for major locations)
+- Specific treasure amounts and item descriptions
+
+Do NOT include the section heading itself, just the content.
+Match the tone and style of the document.
+Make this section LONGER and MORE DETAILED than the previous version.
+
+Generate the improved section content:`;
 
   const messages: ChatMessage[] = [
     { role: 'system', content: DRAFT_SYSTEM_PROMPT },
     { role: 'user', content: prompt },
   ];
 
-  const response = await chatCompletion(apiKey, modelId, messages, undefined, 0.8);
+  // Use high max_tokens for section regeneration
+  const response = await chatCompletion(apiKey, modelId, messages, undefined, 0.8, 8000);
   const newContent = response.choices[0]?.message?.content || '';
 
   // Replace the section in the original markdown
